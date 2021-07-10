@@ -25,7 +25,7 @@ func (p *AccountClient) Init(accessKey string, secretKey string, host string) *A
 }
 
 // Returns a list of accounts owned by this API user
-func (p *AccountClient) GetAccountInfo(gateWayHost string) ([]account.AccountInfo, error) {
+func (p *AccountClient) GetAccountInfo(gatewayHost string) ([]account.AccountInfo, error) {
 	// create post body to gateway
 	request := dtos.BaseReqModel{
 		AimSite: "HuoBi",
@@ -40,22 +40,22 @@ func (p *AccountClient) GetAccountInfo(gateWayHost string) ([]account.AccountInf
 	}
 
 	// build url to gate way
-	url := fmt.Sprintf("http://%s/api/v1/Chomolungma/entrypoint", gateWayHost)
-	gateWayRsp, postErr := internal.HttpPost(url, postBody)
+	url := fmt.Sprintf("http://%s/api/v1/Chomolungma/entrypoint", gatewayHost)
+	gatewayRsp, postErr := internal.HttpPost(url, postBody)
 	if postErr != nil {
 		return nil, postErr
 	}
 
 	// first parse the gin rsp
 	rawRsp := dtos.BaseRspModel{}
-	jsonErr = json.Unmarshal([]byte(gateWayRsp), &rawRsp)
+	jsonErr = json.Unmarshal([]byte(gatewayRsp), &rawRsp)
 	if jsonErr != nil {
 		return nil, jsonErr
 	}
 
 	// then parse the data in gin rsp
 	if rawRsp.Code != dtos.OK {
-		return nil, errors.New(gateWayRsp)
+		return nil, errors.New(gatewayRsp)
 	}
 
 	result := account.GetAccountInfoResponse{}
@@ -67,7 +67,7 @@ func (p *AccountClient) GetAccountInfo(gateWayHost string) ([]account.AccountInf
 		return result.Data, nil
 	}
 
-	return nil, errors.New(gateWayRsp)
+	return nil, errors.New(gatewayRsp)
 }
 
 // Returns the balance of an account specified by account id

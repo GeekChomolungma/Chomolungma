@@ -22,7 +22,6 @@ type Server struct {
 var ServerSetting = &Server{}
 
 type HuoBiApiConf struct {
-	GateWayHost   string
 	ApiServerHost string
 	AccessKey     string
 	AccountId     string
@@ -33,6 +32,12 @@ type HuoBiApiConf struct {
 
 var HuoBiApiSetting = &HuoBiApiConf{}
 
+type GatewayConf struct {
+	GatewayHost string
+}
+
+var GatewaySetting = &GatewayConf{}
+
 // Setup 启动配置
 func Setup() {
 	cfg, err := ini.Load("./my.ini")
@@ -42,6 +47,7 @@ func Setup() {
 
 	mapTo(cfg, "mysql", MySQLSetting)
 	mapTo(cfg, "server", ServerSetting)
+	mapTo(cfg, "gateway", GatewaySetting)
 	mapTo(cfg, "huobi", HuoBiApiSetting)
 }
 

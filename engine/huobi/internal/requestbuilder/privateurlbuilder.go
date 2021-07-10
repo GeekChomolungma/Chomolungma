@@ -9,7 +9,7 @@ import (
 )
 
 type PrivateUrlBuilder struct {
-	gateWayHost string
+	gatewayHost string
 	host        string
 	akKey       string
 	akValue     string

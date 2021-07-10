@@ -15,7 +15,7 @@ func (HBCylinder *HuoBiCylinder) Ignite() {
 		config.HuoBiApiSetting.SecretKey,
 		config.HuoBiApiSetting.ApiServerHost,
 	)
-	resp, err := client.GetAccountInfo(config.HuoBiApiSetting.GateWayHost)
+	resp, err := client.GetAccountInfo(config.GatewaySetting.GatewayHost)
 	if err != nil {
 		applogger.Error("Get account error: %s", err)
 	} else {
