@@ -9,15 +9,14 @@ import (
 )
 
 type PrivateUrlBuilder struct {
-	gatewayHost string
-	host        string
-	akKey       string
-	akValue     string
-	smKey       string
-	smValue     string
-	svKey       string
-	svValue     string
-	tKey        string
+	host    string
+	akKey   string
+	akValue string
+	smKey   string
+	smValue string
+	svKey   string
+	svValue string
+	tKey    string
 
 	signer *Signer
 }
