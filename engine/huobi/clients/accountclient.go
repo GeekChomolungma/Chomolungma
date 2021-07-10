@@ -57,7 +57,7 @@ func (p *AccountClient) GetAccountInfo() ([]account.AccountInfo, error) {
 
 	// then parse the data in gin rsp
 	if rawRsp.Code != dtos.OK {
-		return nil, errors.New(gatewayRsp)
+		return nil, errors.New("ERROR: Gateway response a error msg")
 	}
 
 	result := account.GetAccountInfoResponse{}
@@ -69,7 +69,7 @@ func (p *AccountClient) GetAccountInfo() ([]account.AccountInfo, error) {
 		return result.Data, nil
 	}
 
-	return nil, errors.New(gatewayRsp)
+	return nil, errors.New(rawRsp.Data)
 }
 
 // Returns the balance of an account specified by account id
