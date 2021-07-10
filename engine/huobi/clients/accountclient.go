@@ -15,17 +15,19 @@ import (
 
 // Responsible to operate account
 type AccountClient struct {
+	gatewayHost       string
 	privateUrlBuilder *requestbuilder.PrivateUrlBuilder
 }
 
 // Initializer
-func (p *AccountClient) Init(accessKey string, secretKey string, host string) *AccountClient {
+func (p *AccountClient) Init(gatewayHost string, accessKey string, secretKey string, host string) *AccountClient {
+	p.gatewayHost = gatewayHost
 	p.privateUrlBuilder = new(requestbuilder.PrivateUrlBuilder).Init(accessKey, secretKey, host)
 	return p
 }
 
 // Returns a list of accounts owned by this API user
-func (p *AccountClient) GetAccountInfo(gatewayHost string) ([]account.AccountInfo, error) {
+func (p *AccountClient) GetAccountInfo() ([]account.AccountInfo, error) {
 	// create post body to gateway
 	request := dtos.BaseReqModel{
 		AimSite: "HuoBi",
@@ -40,7 +42,7 @@ func (p *AccountClient) GetAccountInfo(gatewayHost string) ([]account.AccountInf
 	}
 
 	// build url to gate way
-	url := fmt.Sprintf("http://%s/api/v1/Chomolungma/entrypoint", gatewayHost)
+	url := fmt.Sprintf("http://%s/api/v1/Chomolungma/entrypoint", p.gatewayHost)
 	gatewayRsp, postErr := internal.HttpPost(url, postBody)
 	if postErr != nil {
 		return nil, postErr
