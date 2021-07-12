@@ -3,7 +3,7 @@ package huobi
 import (
 	"github.com/GeekChomolungma/Chomolungma/config"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/clients"
-	"github.com/huobirdcenter/huobi_golang/logging/applogger"
+	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
 )
 
 func getAccountInfo() {

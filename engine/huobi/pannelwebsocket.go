@@ -6,7 +6,7 @@ import (
 	"github.com/GeekChomolungma/Chomolungma/config"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/clients/marketwebsocketclient"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/market"
-	"github.com/huobirdcenter/huobi_golang/logging/applogger"
+	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
 )
 
 func subscribeMarketInfo() {
@@ -15,8 +15,7 @@ func subscribeMarketInfo() {
 
 	wsClient.SetHandler(
 		func() {
-			//wsClient.Request("btcusdt", "1min", 1569361140, 1569366420, "2305")
-
+			wsClient.Request("btcusdt", "1min", 1569361140, 1569366420, "2305")
 			wsClient.Subscribe("btcusdt", "1min", "2118")
 		},
 		func(response interface{}) {

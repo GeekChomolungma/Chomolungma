@@ -6,7 +6,7 @@ import (
 
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/clients/websocketclientbase"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/market"
-	"github.com/huobirdcenter/huobi_golang/logging/applogger"
+	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
 )
 
 // Responsible to handle last 24h candlestick data from WebSocket

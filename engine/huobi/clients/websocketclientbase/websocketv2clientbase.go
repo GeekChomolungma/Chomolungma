@@ -10,8 +10,8 @@ import (
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/internal/requestbuilder"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/auth"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/base"
+	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
 	"github.com/gorilla/websocket"
-	"github.com/huobirdcenter/huobi_golang/logging/applogger"
 )
 
 const (

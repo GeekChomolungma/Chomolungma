@@ -8,8 +8,8 @@ import (
 
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/internal/gzip"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/internal/model"
+	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
 	"github.com/gorilla/websocket"
-	"github.com/huobirdcenter/huobi_golang/logging/applogger"
 )
 
 const (
