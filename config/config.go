@@ -33,7 +33,8 @@ type HuoBiApiConf struct {
 var HuoBiApiSetting = &HuoBiApiConf{}
 
 type GatewayConf struct {
-	GatewayHost string
+	GatewayHost    string
+	GatewayTcpHost string
 }
 
 var GatewaySetting = &GatewayConf{}
