@@ -17,7 +17,6 @@ func subscribeMarketInfo() {
 	// connect market db
 	s, err := db.CreateMarketDBSession()
 	client := s.DB("marketinfo").C("btcusdt")
-
 	defer s.Close()
 	if err != nil {
 		applogger.Error("Failed to connection db: %s", err.Error())
@@ -69,22 +68,7 @@ func subscribeMarketInfo() {
 										tmp.Id, tmp.Count, tmp.Vol, tmp.Open, tmp.Close, tmp.Low, tmp.High)
 								}
 							}
-						} else {
-							// if exist, then update
-							// selector := &market.Tick{
-							// 	Id: t.Id,
-							// }
-							// err = client.Update(selector, &t)
-							// if err != nil {
-							// 	applogger.Error("Failed to update to db: %s", err.Error())
-							// } else {
-							// 	applogger.Info("Candlestick update to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-							// 		t.Id, t.Count, t.Vol, t.Open, t.Close, t.Low, t.High)
-							// }
-							applogger.Info("Candlestick found in db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-								t.Id, t.Count, t.Vol, t.Open, t.Close, t.Low, t.High)
 						}
-
 						tmp = t
 					}
 
