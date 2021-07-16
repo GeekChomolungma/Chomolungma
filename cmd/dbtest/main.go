@@ -10,8 +10,8 @@ import (
 func main() {
 
 	tmp := &market.Tick{
-		Id:    1626430680,
-		Count: 9999,
+		Id:    1626453720,
+		Count: 1234,
 	}
 
 	mongo, err := mgo.Dial("mongodb://market:admin123@localhost:27017")
@@ -21,13 +21,9 @@ func main() {
 	}
 
 	client := mongo.DB("marketinfo").C("btcusdt")
-	//ticker := &market.Tick{}
-	//err = client.Find(bson.M{"id": 1626430680}).One(ticker)
-	// if not exist, insert
-	//applogger.Error("Failed to find ID in db: %s", err.Error())
 
 	// update the previous data
-	selector := bson.M{"id": 1626430680}
+	selector := bson.M{"id": 1626453720}
 	err = client.Update(selector, tmp)
 	if err != nil {
 		applogger.Error("Failed to update to db: %s", err.Error())
