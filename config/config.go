@@ -6,14 +6,12 @@ import (
 	"github.com/go-ini/ini"
 )
 
-type MySQLConf struct {
-	Host     string
-	User     string
-	PassWord string
-	DataBase string
+type MongoConf struct {
+	MarketUrl  string
+	AccountUrl string
 }
 
-var MySQLSetting = &MySQLConf{}
+var MongoSetting = &MongoConf{}
 
 type Server struct {
 	Host string
@@ -46,7 +44,7 @@ func Setup() {
 		log.Fatalf("Fail to parse '../my.ini': %v", err)
 	}
 
-	mapTo(cfg, "mysql", MySQLSetting)
+	mapTo(cfg, "mongo", MongoSetting)
 	mapTo(cfg, "server", ServerSetting)
 	mapTo(cfg, "gateway", GatewaySetting)
 	mapTo(cfg, "huobi", HuoBiApiSetting)

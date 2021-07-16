@@ -13,6 +13,8 @@ func main() {
 	// config server
 	config.Setup()
 
+	// setup mongodb
+
 	// setup the trade engine
 	engine.EngineBus = &engine.TradeEngine{
 		Cylinders: make(map[string]engine.Cylinder),
