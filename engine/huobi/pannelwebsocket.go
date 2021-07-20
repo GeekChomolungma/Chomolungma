@@ -13,11 +13,26 @@ import (
 
 var tmp *market.Tick
 
-func subscribeMarketInfo() {
+type periodUnit string
+
+const (
+	Period_1min   periodUnit = "1min"
+	Period_5min   periodUnit = "5min"
+	Period_15min  periodUnit = "15min"
+	Period_30min  periodUnit = "30min"
+	Period_60min  periodUnit = "60min"
+	Period_4hour  periodUnit = "4hour"
+	Period_1mon   periodUnit = "1mon"
+	Period_1week  periodUnit = "1week"
+	Period_1yeark periodUnit = "1year"
+)
+
+func subscribeMarketInfo(symbol string, period periodUnit) {
 	// connect market db
 	s, err := db.CreateMarketDBSession()
-	client := s.DB("marketinfo").C("btcusdt")
-	defer s.Close()
+	collectionName := fmt.Sprintf("%s-%s", symbol, string(period))
+	client := s.DB("marketinfo").C(collectionName)
+	mgoSessionMap[collectionName] = s
 	if err != nil {
 		applogger.Error("Failed to connection db: %s", err.Error())
 		return
@@ -28,8 +43,8 @@ func subscribeMarketInfo() {
 
 	wsClient.SetHandler(
 		func() {
-			wsClient.Request("btcusdt", "1min", 1569361140, 1569366420, "2305")
-			wsClient.Subscribe("btcusdt", "1min", "2118")
+			wsClient.Request(symbol, string(period), 1569361140, 1569366420, "2305")
+			wsClient.Subscribe(symbol, string(period), "2118")
 		},
 		func(response interface{}) {
 			resp, ok := response.(market.SubscribeCandlestickResponse)
@@ -81,6 +96,59 @@ func subscribeMarketInfo() {
 							ticker := &market.Tick{}
 							err := client.Find(bson.M{"id": t.Id}).One(ticker)
 							if err != nil {
+								// if not exist, insert
+								applogger.Error("not exist, insert")
+								err = client.Insert(&t)
+								if err != nil {
+									applogger.Error("Failed to connection db: %s", err.Error())
+								} else {
+									applogger.Info("Candlestick data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+										t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
+								}
+							}
+						}
+					}
+				}
+			} else {
+				applogger.Warn("Unknown response: %v", resp)
+			}
+
+		})
+
+	wsClient.Connect(true)
+	wsCandlestickClientMap[collectionName] = wsClient
+}
+
+func flowWindowMarketInfo(symbol string, period periodUnit) {
+	// connect market db
+	s, err := db.CreateMarketDBSession()
+	client := s.DB("marketinfo").C(symbol)
+	defer s.Close()
+	if err != nil {
+		applogger.Error("Failed to connection db: %s", err.Error())
+		return
+	}
+
+	// websocket
+	wsClient := new(marketwebsocketclient.CandlestickWebSocketClient).Init(config.GatewaySetting.GatewayHost)
+
+	wsClient.SetHandler(
+		func() {
+			wsClient.Request(symbol, string(period), 1569361140, 1569366420, "2305")
+		},
+		func(response interface{}) {
+			resp, ok := response.(market.SubscribeCandlestickResponse)
+			if ok {
+				if &resp != nil {
+					if resp.Data != nil {
+						applogger.Info("WebSocket returned data, count=%d", len(resp.Data))
+						for _, t := range resp.Data {
+							applogger.Info("Candlestick data, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+								t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
+
+							ticker := &market.Tick{}
+							err := client.Find(bson.M{"id": t.Id}).One(ticker)
+							if err != nil {
 								applogger.Error("Failed to find ID in db: %s", err.Error())
 								continue
 							}
@@ -109,7 +177,7 @@ func subscribeMarketInfo() {
 	fmt.Println("Press ENTER to unsubscribe and stop...")
 	fmt.Scanln()
 
-	wsClient.UnSubscribe("btcusdt", "1min", "2118")
+	wsClient.UnSubscribe(symbol, string(period), "2118")
 
 	wsClient.Close()
 	applogger.Info("Client closed")

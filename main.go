@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
+	"time"
 
 	"github.com/GeekChomolungma/Chomolungma/config"
 	"github.com/GeekChomolungma/Chomolungma/engine"
@@ -21,6 +24,18 @@ func main() {
 	}
 	engine.EngineBus.Load()
 	engine.EngineBus.Run()
+
+	c := make(chan os.Signal, 5)
+	signal.Notify(c)
+	for {
+		select {
+		case <-c:
+			engine.EngineBus.Stop()
+			return
+		default:
+			time.Sleep(time.Duration(3) * time.Second)
+		}
+	}
 
 	// // register gin server
 	// r := gin.Default()

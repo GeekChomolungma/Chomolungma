@@ -7,6 +7,7 @@ var EngineBus *TradeEngine
 // each cylinder of the main engine
 type Cylinder interface {
 	Ignite()
+	Flameout()
 }
 
 // main engine for trade
@@ -21,5 +22,11 @@ func (te *TradeEngine) Load() {
 func (te *TradeEngine) Run() {
 	for _, cy := range te.Cylinders {
 		cy.Ignite()
+	}
+}
+
+func (te *TradeEngine) Stop() {
+	for _, cy := range te.Cylinders {
+		cy.Flameout()
 	}
 }

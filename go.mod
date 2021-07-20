@@ -3,6 +3,7 @@ module github.com/GeekChomolungma/Chomolungma
 go 1.16
 
 require (
+	github.com/bitly/go-simplejson v0.5.0 // indirect
 	github.com/gin-gonic/gin v1.7.2
 	github.com/go-ini/ini v1.62.0
 	github.com/go-playground/validator/v10 v10.7.0 // indirect
