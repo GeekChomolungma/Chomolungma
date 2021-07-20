@@ -32,7 +32,7 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 	s, err := db.CreateMarketDBSession()
 	collectionName := fmt.Sprintf("%s-%s", symbol, string(period))
 	client := s.DB("marketinfo").C(collectionName)
-	mgoSessionMap[collectionName] = s
+	mgoSessionMap[collectionName+"-subscribeMarketInfo"] = s
 	if err != nil {
 		applogger.Error("Failed to connection db: %s", err.Error())
 		return
@@ -43,7 +43,7 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 
 	wsClient.SetHandler(
 		func() {
-			wsClient.Request(symbol, string(period), 1569361140, 1569366420, "2305")
+			//wsClient.Request(symbol, string(period), 1569361140, 1569366420, "2305")
 			wsClient.Subscribe(symbol, string(period), "2118")
 		},
 		func(response interface{}) {
@@ -116,14 +116,18 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 		})
 
 	wsClient.Connect(true)
-	wsCandlestickClientMap[collectionName] = wsClient
+	wsCandlestickClientMap[collectionName+"-subscribeMarketInfo"] = wsClient
 }
 
-func flowWindowMarketInfo(symbol string, period periodUnit) {
+// flowWindowMarketInfo returns tickers, and the max tickers number is 300 once.
+// So, startTime and toTime should be constrain for:
+//                   (toTime - startTime)/period < 300
+func flowWindowMarketInfo(symbol string, period periodUnit, startTime int64, toTime int64) {
 	// connect market db
 	s, err := db.CreateMarketDBSession()
-	client := s.DB("marketinfo").C(symbol)
-	defer s.Close()
+	collectionName := fmt.Sprintf("%s-%s", symbol, string(period))
+	client := s.DB("marketinfo").C(collectionName)
+	mgoSessionMap[collectionName+"-flowWindowMarketInfo"] = s
 	if err != nil {
 		applogger.Error("Failed to connection db: %s", err.Error())
 		return
@@ -131,10 +135,9 @@ func flowWindowMarketInfo(symbol string, period periodUnit) {
 
 	// websocket
 	wsClient := new(marketwebsocketclient.CandlestickWebSocketClient).Init(config.GatewaySetting.GatewayHost)
-
 	wsClient.SetHandler(
 		func() {
-			wsClient.Request(symbol, string(period), 1569361140, 1569366420, "2305")
+			wsClient.Request(symbol, string(period), startTime, toTime, "2305")
 		},
 		func(response interface{}) {
 			resp, ok := response.(market.SubscribeCandlestickResponse)
@@ -149,20 +152,16 @@ func flowWindowMarketInfo(symbol string, period periodUnit) {
 							ticker := &market.Tick{}
 							err := client.Find(bson.M{"id": t.Id}).One(ticker)
 							if err != nil {
-								applogger.Error("Failed to find ID in db: %s", err.Error())
-								continue
+								// if not exist, insert
+								applogger.Error("not exist, insert")
+								err = client.Insert(&t)
+								if err != nil {
+									applogger.Error("Failed to connection db: %s", err.Error())
+								} else {
+									applogger.Info("Candlestick data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+										t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
+								}
 							}
-							if ticker.Id == t.Id {
-								continue
-							}
-							err = client.Insert(&t)
-							if err != nil {
-								applogger.Error("Failed to connection db: %s", err.Error())
-							} else {
-								applogger.Info("Candlestick data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-									t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
-							}
-
 						}
 					}
 				}
@@ -173,12 +172,5 @@ func flowWindowMarketInfo(symbol string, period periodUnit) {
 		})
 
 	wsClient.Connect(true)
-
-	fmt.Println("Press ENTER to unsubscribe and stop...")
-	fmt.Scanln()
-
-	wsClient.UnSubscribe(symbol, string(period), "2118")
-
-	wsClient.Close()
-	applogger.Info("Client closed")
+	wsCandlestickClientMap[collectionName+"-flowWindowMarketInfo"] = wsClient
 }
