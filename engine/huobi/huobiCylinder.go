@@ -16,23 +16,23 @@ var httpClientMap map[string]interface{}
 type HuoBiCylinder struct {
 }
 
-// Ignite() start up to update data: market, account, order..
+// Ignite starts up to update data: market, account, order..
 // Those data will be used internal Chmolungma
 func (HBCylinder *HuoBiCylinder) Ignite() {
 	mgoSessionMap = make(map[string]*mgo.Session)
 	wsCandlestickClientMap = make(map[string]*marketwebsocketclient.CandlestickWebSocketClient)
 	httpClientMap = make(map[string]interface{})
 
-	flowWindowMarketInfo("btcusdt", Period_1min, 1626710400, 1626746400) // 1626710400 1626728400 1626746400
+	// subscribe the marketinfo
+	flowWindowMarketInfo("btcusdt", Period_1min, 1626710400, 1626746400)
 	subscribeMarketInfo("btcusdt", Period_1min)
-	//getAccountInfo()
 }
 
-// Flameout() elegantly stop the Cylinder
+// Flameout elegantly stop the Cylinder
 func (HBCylinder *HuoBiCylinder) Flameout() {
 	CandlestickClientFlameout()
 
-	time.Sleep(time.Duration(5) * time.Second)
+	time.Sleep(time.Duration(2) * time.Second)
 	for _, session := range mgoSessionMap {
 		session.Close()
 	}

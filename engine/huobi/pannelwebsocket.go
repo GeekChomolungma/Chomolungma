@@ -44,7 +44,6 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 
 	wsClient.SetHandler(
 		func() {
-			//wsClient.Request(symbol, string(period), 1569361140, 1569366420, "2305")
 			wsClient.Subscribe(symbol, string(period), "2118")
 		},
 		func(response interface{}) {
