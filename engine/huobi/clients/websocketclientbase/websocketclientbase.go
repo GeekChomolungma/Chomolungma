@@ -113,7 +113,7 @@ func (p *WebSocketClientBase) connectWebSocket() {
 	applogger.Debug("WebSocket connecting...")
 	p.conn, _, err = websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
-		applogger.Error("WebSocket connected error: %s", err)
+		applogger.Error("WebSocket connected error: %s", err.Error())
 		return
 	}
 	applogger.Info("WebSocket connected")
