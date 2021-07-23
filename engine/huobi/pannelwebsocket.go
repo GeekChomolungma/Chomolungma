@@ -55,13 +55,14 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 						applogger.Info("Candlestick update, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
 							t.Id, t.Count, t.Vol, t.Open, t.Close, t.Low, t.High)
 
-						ticker := &market.Tick{}
-						err := client.Find(bson.M{"id": t.Id}).One(ticker)
+						tickerRetrive := &market.TickFloat{}
+						err := client.Find(bson.M{"id": t.Id}).One(tickerRetrive)
 						if err != nil {
 							// if not exist, insert
 							// insert new data
 							applogger.Info("Failed to find ID in db, insert the new data.")
-							err = client.Insert(t)
+							tickerWrite := t.TickToFloat()
+							err = client.Insert(tickerWrite)
 							if err != nil {
 								applogger.Error("Failed to Insert data : %s", err.Error())
 							} else {
@@ -75,7 +76,8 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 
 								// update the previous data
 								selector := bson.M{"id": tmp.Id}
-								err := client.Update(selector, tmp)
+								tmpFloat := tmp.TickToFloat()
+								err := client.Update(selector, tmpFloat)
 								if err != nil {
 									applogger.Error("Failed to update to db: %s", err.Error())
 								} else {
@@ -93,12 +95,13 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 							applogger.Info("Candlestick data, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
 								t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
 
-							ticker := &market.Tick{}
-							err := client.Find(bson.M{"id": t.Id}).One(ticker)
+							tickerRetrive := &market.TickFloat{}
+							err := client.Find(bson.M{"id": t.Id}).One(tickerRetrive)
 							if err != nil {
 								// if not exist, insert
 								applogger.Error("not exist, insert")
-								err = client.Insert(&t)
+								tickerWrite := t.TickToFloat()
+								err = client.Insert(tickerWrite)
 								if err != nil {
 									applogger.Error("Failed to connection db: %s", err.Error())
 								} else {
@@ -166,7 +169,8 @@ func flowWindowMarketInfo(symbol string, period periodUnit, startTime int64, toT
 							if err != nil {
 								// if not exist, insert
 								applogger.Error("not exist, insert")
-								err = client.Insert(&t)
+								tickerWrite := t.TickToFloat()
+								err = client.Insert(tickerWrite)
 								if err != nil {
 									applogger.Error("Failed to connection db: %s", err.Error())
 								} else {
