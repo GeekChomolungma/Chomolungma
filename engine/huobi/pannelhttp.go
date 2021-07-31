@@ -3,6 +3,7 @@ package huobi
 import (
 	"github.com/GeekChomolungma/Chomolungma/config"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/clients"
+	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/account"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/order"
 	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
 )
@@ -26,7 +27,24 @@ func GetAccountInfo() {
 	}
 }
 
-func PlaceOrder() {
+func GetAccountBalance() (*account.AccountBalance, error) {
+	httpClient := new(clients.AccountClient).Init(
+		config.GatewaySetting.GatewayHost,
+		config.HuoBiApiSetting.AccessKey,
+		config.HuoBiApiSetting.SecretKey,
+		config.HuoBiApiSetting.ApiServerHost,
+	)
+	resp, err := httpClient.GetAccountBalance("3667382")
+	if err != nil {
+		applogger.Error("Cannot get account balance: %s", err)
+		return nil, err
+	} else {
+		applogger.Info("Get account balance, %d", resp)
+		return resp, nil
+	}
+}
+
+func PlaceOrder(model, price, amount string) {
 	client := new(clients.OrderClient).Init(
 		config.GatewaySetting.GatewayHost,
 		config.HuoBiApiSetting.AccessKey,
@@ -35,11 +53,11 @@ func PlaceOrder() {
 	)
 	request := order.PlaceOrderRequest{
 		AccountId: "3667382",
-		Type:      "buy-limit",
+		Type:      model, //"buy-limit",
 		Source:    "spot-api",
 		Symbol:    "btcusdt",
-		Price:     "100",
-		Amount:    "1",
+		Price:     price,  //"100",
+		Amount:    amount, //"1",
 	}
 	resp, err := client.PlaceOrder(&request)
 	if err != nil {

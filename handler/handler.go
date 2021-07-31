@@ -7,6 +7,7 @@ import (
 	"github.com/GeekChomolungma/Chomolungma/dtos"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi"
 	"github.com/gin-gonic/gin"
+	jsoniter "github.com/json-iterator/go"
 )
 
 // handler is used for strategy
@@ -17,6 +18,7 @@ func LocalServer() {
 	r := gin.Default()
 	// for user login or signup
 	r.POST("/api/v1/account/accountinfo", getAccountInfo)
+	r.POST("/api/v1/account/accountbalance", getAccountBalance)
 	r.POST("/api/v1/order/placeorder", placeOrder)
 	// server run!
 	r.Run(config.ServerSetting.Host)
@@ -38,6 +40,26 @@ func getAccountInfo(c *gin.Context) {
 	}
 }
 
+func getAccountBalance(c *gin.Context) {
+	var Req dtos.HttpReqModel
+	err := c.Bind(&Req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": dtos.CANNOT_PARSE_POST_BODY, "msg": "Sorry", "data": err.Error()})
+		return
+	}
+
+	switch Req.AimSite {
+	case "HuoBi":
+		balance, err := huobi.GetAccountBalance()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"code": dtos.CANNOT_GET_ACCOUNT_BALANCE, "msg": "Sorry", "data": err.Error()})
+		}
+		c.JSON(http.StatusOK, gin.H{"code": dtos.AIM_SITE_NOT_EXIST, "msg": "OK", "data": balance})
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"code": dtos.AIM_SITE_NOT_EXIST, "msg": "Sorry", "data": err.Error()})
+	}
+}
+
 func placeOrder(c *gin.Context) {
 	var Req dtos.HttpReqModel
 	err := c.Bind(&Req)
@@ -48,7 +70,13 @@ func placeOrder(c *gin.Context) {
 
 	switch Req.AimSite {
 	case "HuoBi":
-		huobi.PlaceOrder()
+		orderInfo := &dtos.OrderInfo{}
+		err = jsoniter.UnmarshalFromString(Req.Body, orderInfo)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"code": dtos.CANNOT_PARSE_POST_BODY, "msg": "Sorry", "data": err.Error()})
+			return
+		}
+		huobi.PlaceOrder(orderInfo.Model, orderInfo.Price, orderInfo.Amount)
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"code": dtos.AIM_SITE_NOT_EXIST, "msg": "Sorry", "data": err.Error()})
 	}

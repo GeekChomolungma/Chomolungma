@@ -74,13 +74,40 @@ func (p *AccountClient) GetAccountInfo() ([]account.AccountInfo, error) {
 
 // Returns the balance of an account specified by account id
 func (p *AccountClient) GetAccountBalance(accountId string) (*account.AccountBalance, error) {
-	url := p.privateUrlBuilder.Build("GET", "/v1/account/accounts/"+accountId+"/balance", nil)
-	getResp, getErr := internal.HttpGet(url)
-	if getErr != nil {
-		return nil, getErr
+	// create post body to gateway
+	request := dtos.BaseReqModel{
+		AimSite: "HuoBi",
+		Method:  "GET",
+		Body:    "",
 	}
+	urlMsg := p.privateUrlBuilder.Build("GET", "/v1/account/accounts/"+accountId+"/balance", nil)
+	request.Url = urlMsg
+	postBody, jsonErr := model.ToJson(request)
+	if jsonErr != nil {
+		return nil, jsonErr
+	}
+
+	// build url to gate way
+	url := fmt.Sprintf("http://%s/api/v1/Chomolungma/entrypoint", p.gatewayHost)
+	gatewayRsp, postErr := internal.HttpPost(url, postBody)
+	if postErr != nil {
+		return nil, postErr
+	}
+
+	// first parse the gin rsp
+	rawRsp := dtos.BaseRspModel{}
+	jsonErr = json.Unmarshal([]byte(gatewayRsp), &rawRsp)
+	if jsonErr != nil {
+		return nil, jsonErr
+	}
+
+	// then parse the data in gin rsp
+	if rawRsp.Code != dtos.OK {
+		return nil, errors.New("ERROR: Gateway response a error msg")
+	}
+
 	result := account.GetAccountBalanceResponse{}
-	jsonErr := json.Unmarshal([]byte(getResp), &result)
+	jsonErr = json.Unmarshal([]byte(rawRsp.Data), &result)
 	if jsonErr != nil {
 		return nil, jsonErr
 	}
@@ -88,7 +115,7 @@ func (p *AccountClient) GetAccountBalance(accountId string) (*account.AccountBal
 		return result.Data, nil
 	}
 
-	return nil, errors.New(getResp)
+	return nil, errors.New(rawRsp.Data)
 }
 
 // Returns the valuation of the total assets of the account in btc or fiat currency.
