@@ -1,6 +1,8 @@
 package huobi
 
 import (
+	"strings"
+
 	"github.com/GeekChomolungma/Chomolungma/config"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/clients"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/account"
@@ -39,7 +41,7 @@ func GetAccountBalance() (*account.AccountBalance, error) {
 		applogger.Error("Cannot get account balance: %s", err)
 		return nil, err
 	} else {
-		applogger.Info("Get account balance, %d", resp)
+		applogger.Info("Get account balance, %v", resp)
 		return resp, nil
 	}
 }
@@ -56,9 +58,16 @@ func PlaceOrder(model, price, amount string) {
 		Type:      model, //"buy-limit",
 		Source:    "spot-api",
 		Symbol:    "btcusdt",
-		Price:     price,  //"100",
-		Amount:    amount, //"1",
 	}
+	amountSeperates := strings.Split(amount, ".")
+	//applogger.Info("amount is %s", amountSeperates[0])
+	request.Amount = amountSeperates[0]
+	if model == "buy-market" {
+		applogger.Info("market order, no price, req is: %v", request)
+	} else {
+		request.Price = price
+	}
+
 	resp, err := client.PlaceOrder(&request)
 	if err != nil {
 		applogger.Error(err.Error())
