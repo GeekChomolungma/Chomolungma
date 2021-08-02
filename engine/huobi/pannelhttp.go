@@ -1,6 +1,7 @@
 package huobi
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/GeekChomolungma/Chomolungma/config"
@@ -60,9 +61,24 @@ func PlaceOrder(model, price, amount string) {
 		Symbol:    "btcusdt",
 	}
 	amountSeperates := strings.Split(amount, ".")
-	//applogger.Info("amount is %s", amountSeperates[0])
-	request.Amount = amountSeperates[0]
+	applogger.Info("model is %s", model)
 	if model == "buy-market" {
+		// usdt scale 8
+		request.Amount = amountSeperates[0]
+	} else {
+		if model == "sell-market" {
+			// btc scale 6
+			rawDecimal := amountSeperates[1]
+			Decimal := rawDecimal[0:6]
+			amount := fmt.Sprintf("%s.%s", amountSeperates[0], Decimal)
+			request.Amount = amount
+			applogger.Info("btc amount to sell is %s", amount)
+		} else {
+			request.Amount = amount
+		}
+	}
+
+	if model == "buy-market" || model == "sell-market" {
 		applogger.Info("market order, no price, req is: %v", request)
 	} else {
 		request.Price = price
