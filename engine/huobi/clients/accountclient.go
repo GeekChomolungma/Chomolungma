@@ -11,6 +11,7 @@ import (
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/internal/requestbuilder"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/account"
+	jsoniter "github.com/json-iterator/go"
 )
 
 // Responsible to operate account
@@ -26,15 +27,8 @@ func (p *AccountClient) Init(gatewayHost string, accessKey string, secretKey str
 	return p
 }
 
-// Returns a list of accounts owned by this API user
-func (p *AccountClient) GetAccountInfo() ([]account.AccountInfo, error) {
-	// create post body to gateway
-	request := dtos.BaseReqModel{
-		AimSite: "HuoBi",
-		Method:  "GET",
-		Body:    "",
-	}
-	urlMsg := p.privateUrlBuilder.Build("GET", "/v1/account/accounts", nil)
+func (p *AccountClient) BuildAndPostGatewayUrl(request *dtos.BaseReqModel, originUrl string) (*dtos.BaseRspModel, error) {
+	urlMsg := p.privateUrlBuilder.Build(request.Method, originUrl, nil)
 	request.Url = urlMsg
 	postBody, jsonErr := model.ToJson(request)
 	if jsonErr != nil {
@@ -49,8 +43,8 @@ func (p *AccountClient) GetAccountInfo() ([]account.AccountInfo, error) {
 	}
 
 	// first parse the gin rsp
-	rawRsp := dtos.BaseRspModel{}
-	jsonErr = json.Unmarshal([]byte(gatewayRsp), &rawRsp)
+	rawRsp := &dtos.BaseRspModel{}
+	jsonErr = json.Unmarshal([]byte(gatewayRsp), rawRsp)
 	if jsonErr != nil {
 		return nil, jsonErr
 	}
@@ -60,8 +54,25 @@ func (p *AccountClient) GetAccountInfo() ([]account.AccountInfo, error) {
 		return nil, errors.New("ERROR: Gateway response a error msg")
 	}
 
+	return rawRsp, nil
+}
+
+// Returns a list of accounts owned by this API user
+func (p *AccountClient) GetAccountInfo() ([]account.AccountInfo, error) {
+	// create post body to gateway
+	request := &dtos.BaseReqModel{
+		AimSite: "HuoBi",
+		Method:  "GET",
+	}
+
+	// build gateway url and post it
+	rawRsp, err := p.BuildAndPostGatewayUrl(request, "/v1/account/accounts")
+	if err != nil {
+		return nil, err
+	}
+
 	result := account.GetAccountInfoResponse{}
-	jsonErr = json.Unmarshal([]byte(rawRsp.Data), &result)
+	jsonErr := jsoniter.Unmarshal([]byte(rawRsp.Data), &result)
 	if jsonErr != nil {
 		return nil, jsonErr
 	}
@@ -75,39 +86,19 @@ func (p *AccountClient) GetAccountInfo() ([]account.AccountInfo, error) {
 // Returns the balance of an account specified by account id
 func (p *AccountClient) GetAccountBalance(accountId string) (*account.AccountBalance, error) {
 	// create post body to gateway
-	request := dtos.BaseReqModel{
+	request := &dtos.BaseReqModel{
 		AimSite: "HuoBi",
 		Method:  "GET",
-		Body:    "",
-	}
-	urlMsg := p.privateUrlBuilder.Build("GET", "/v1/account/accounts/"+accountId+"/balance", nil)
-	request.Url = urlMsg
-	postBody, jsonErr := model.ToJson(request)
-	if jsonErr != nil {
-		return nil, jsonErr
 	}
 
-	// build url to gate way
-	url := fmt.Sprintf("http://%s/api/v1/Chomolungma/entrypoint", p.gatewayHost)
-	gatewayRsp, postErr := internal.HttpPost(url, postBody)
-	if postErr != nil {
-		return nil, postErr
-	}
-
-	// first parse the gin rsp
-	rawRsp := dtos.BaseRspModel{}
-	jsonErr = json.Unmarshal([]byte(gatewayRsp), &rawRsp)
-	if jsonErr != nil {
-		return nil, jsonErr
-	}
-
-	// then parse the data in gin rsp
-	if rawRsp.Code != dtos.OK {
-		return nil, errors.New("ERROR: Gateway response a error msg")
+	// build gateway url and post it
+	rawRsp, err := p.BuildAndPostGatewayUrl(request, "/v1/account/accounts/"+accountId+"/balance")
+	if err != nil {
+		return nil, err
 	}
 
 	result := account.GetAccountBalanceResponse{}
-	jsonErr = json.Unmarshal([]byte(rawRsp.Data), &result)
+	jsonErr := jsoniter.Unmarshal([]byte(rawRsp.Data), &result)
 	if jsonErr != nil {
 		return nil, jsonErr
 	}

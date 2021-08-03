@@ -10,6 +10,7 @@ import (
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/internal/requestbuilder"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/order"
+	jsoniter "github.com/json-iterator/go"
 )
 
 // Responsible to operate on order
@@ -25,37 +26,24 @@ func (p *OrderClient) Init(gatewayHost string, accessKey string, secretKey strin
 	return p
 }
 
-// Place a new order and send to the exchange to be matched.
-func (p *OrderClient) PlaceOrder(request *order.PlaceOrderRequest) (*order.PlaceOrderResponse, error) {
-	postBodyOrigin, jsonErr := model.ToJson(request)
-	if jsonErr != nil {
-		return nil, jsonErr
-	}
-
-	// create post body to gateway
-	requestGateway := dtos.BaseReqModel{
-		AimSite: "HuoBi",
-		Method:  "POST",
-		Body:    postBodyOrigin,
-	}
-
-	urlMsg := p.privateUrlBuilder.Build("POST", "/v1/order/orders/place", nil)
-	requestGateway.Url = urlMsg
-	postBodyGateway, jsonErr := model.ToJson(requestGateway)
+func (p *OrderClient) BuildAndPostGatewayUrl(request *dtos.BaseReqModel, originUrl string) (*dtos.BaseRspModel, error) {
+	urlMsg := p.privateUrlBuilder.Build(request.Method, originUrl, nil)
+	request.Url = urlMsg
+	postBody, jsonErr := model.ToJson(request)
 	if jsonErr != nil {
 		return nil, jsonErr
 	}
 
 	// build url to gate way
 	url := fmt.Sprintf("http://%s/api/v1/Chomolungma/entrypoint", p.gatewayHost)
-	gatewayRsp, postErr := internal.HttpPost(url, postBodyGateway)
+	gatewayRsp, postErr := internal.HttpPost(url, postBody)
 	if postErr != nil {
 		return nil, postErr
 	}
 
 	// first parse the gin rsp
-	rawRsp := dtos.BaseRspModel{}
-	jsonErr = json.Unmarshal([]byte(gatewayRsp), &rawRsp)
+	rawRsp := &dtos.BaseRspModel{}
+	jsonErr = json.Unmarshal([]byte(gatewayRsp), rawRsp)
 	if jsonErr != nil {
 		return nil, jsonErr
 	}
@@ -65,8 +53,31 @@ func (p *OrderClient) PlaceOrder(request *order.PlaceOrderRequest) (*order.Place
 		return nil, errors.New("ERROR: Gateway response a error msg")
 	}
 
+	return rawRsp, nil
+}
+
+// Place a new order and send to the exchange to be matched.
+func (p *OrderClient) PlaceOrder(request *order.PlaceOrderRequest) (*order.PlaceOrderResponse, error) {
+	postBodyOrigin, jsonErr := model.ToJson(request)
+	if jsonErr != nil {
+		return nil, jsonErr
+	}
+
+	// create post body to gateway
+	requestGateway := &dtos.BaseReqModel{
+		AimSite: "HuoBi",
+		Method:  "POST",
+		Body:    postBodyOrigin,
+	}
+
+	// build gateway url and post it
+	rawRsp, err := p.BuildAndPostGatewayUrl(requestGateway, "/v1/order/orders/place")
+	if err != nil {
+		return nil, err
+	}
+
 	result := &order.PlaceOrderResponse{}
-	jsonErr = json.Unmarshal([]byte(rawRsp.Data), result)
+	jsonErr = jsoniter.Unmarshal([]byte(rawRsp.Data), result)
 	if jsonErr != nil {
 		return nil, jsonErr
 	}
