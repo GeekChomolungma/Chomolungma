@@ -91,13 +91,13 @@ func PlaceOrder(symbol, model, amount, price, source string) {
 		rawDecimal := amountSeperates[1]
 
 		baseCurrencyPrecision := sameSym.AmountPrecision
-		applogger.Info("PlaceOrder: Symbol: %s, the amount precision is %d", symbol, sameSym.AmountPrecision)
+		applogger.Info("PlaceOrder: Symbol: %s, the amount precision is %d", symbol, baseCurrencyPrecision)
 		if len(rawDecimal) < baseCurrencyPrecision {
 			// amount too short
 			request.Amount = amount
 		} else {
 			// cut the amount tail
-			Decimal := rawDecimal[0:6]
+			Decimal := rawDecimal[0:baseCurrencyPrecision]
 			amount := fmt.Sprintf("%s.%s", amountSeperates[0], Decimal)
 			request.Amount = amount
 		}
