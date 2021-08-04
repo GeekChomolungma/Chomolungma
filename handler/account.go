@@ -39,6 +39,7 @@ func getAccountBalance(c *gin.Context) {
 		balance, err := huobi.GetAccountBalance()
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"code": dtos.CANNOT_GET_ACCOUNT_BALANCE, "msg": "Sorry", "data": err.Error()})
+			return
 		}
 
 		// get currency type
@@ -53,7 +54,7 @@ func getAccountBalance(c *gin.Context) {
 		for _, v := range balance.List {
 			if v.Currency == balanceReq.Currency {
 				if v.Type == "trade" {
-					c.JSON(http.StatusOK, gin.H{"code": dtos.AIM_SITE_NOT_EXIST, "msg": "OK", "data": v.Balance})
+					c.JSON(http.StatusOK, gin.H{"code": dtos.OK, "msg": "OK", "data": v.Balance})
 					return
 				}
 			}

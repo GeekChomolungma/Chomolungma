@@ -11,4 +11,5 @@ const (
 
 	// bizniz type
 	CANNOT_GET_ACCOUNT_BALANCE = 7
+	CANNOT_GET_SYMBOLS         = 8
 )

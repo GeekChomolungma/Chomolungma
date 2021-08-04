@@ -3,7 +3,9 @@ package clients
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 
+	"github.com/GeekChomolungma/Chomolungma/dtos"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/internal"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/internal/requestbuilder"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model"
@@ -12,13 +14,45 @@ import (
 
 // Responsible to get common information
 type CommonClient struct {
+	gatewayHost      string
 	publicUrlBuilder *requestbuilder.PublicUrlBuilder
 }
 
 // Initializer
-func (p *CommonClient) Init(host string) *CommonClient {
+func (p *CommonClient) Init(gatewayHost string, host string) *CommonClient {
+	p.gatewayHost = gatewayHost
 	p.publicUrlBuilder = new(requestbuilder.PublicUrlBuilder).Init(host)
 	return p
+}
+
+func (p *CommonClient) BuildAndPostGatewayUrl(request *dtos.BaseReqModel, originUrl string) (*dtos.BaseRspModel, error) {
+	urlMsg := p.publicUrlBuilder.Build(originUrl, nil)
+	request.Url = urlMsg
+	postBody, jsonErr := model.ToJson(request)
+	if jsonErr != nil {
+		return nil, jsonErr
+	}
+
+	// build url to gate way
+	url := fmt.Sprintf("http://%s/api/v1/Chomolungma/entrypoint", p.gatewayHost)
+	gatewayRsp, postErr := internal.HttpPost(url, postBody)
+	if postErr != nil {
+		return nil, postErr
+	}
+
+	// first parse the gin rsp
+	rawRsp := &dtos.BaseRspModel{}
+	jsonErr = json.Unmarshal([]byte(gatewayRsp), rawRsp)
+	if jsonErr != nil {
+		return nil, jsonErr
+	}
+
+	// then parse the data in gin rsp
+	if rawRsp.Code != dtos.OK {
+		return nil, errors.New("ERROR: Gateway response a error msg")
+	}
+
+	return rawRsp, nil
 }
 
 func (p *CommonClient) GetSystemStatus() (string, error) {
@@ -53,21 +87,26 @@ func (p *CommonClient) GetMarketStatus() (*common.MarketStatus, error) {
 // Get all Supported Trading Symbol
 // This endpoint returns all Huobi's supported trading symbol.
 func (p *CommonClient) GetSymbols() ([]common.Symbol, error) {
-	url := p.publicUrlBuilder.Build("/v1/common/symbols", nil)
-	getResp, getErr := internal.HttpGet(url)
-	if getErr != nil {
-		return nil, getErr
+	// create post body to gateway
+	request := &dtos.BaseReqModel{
+		AimSite: "HuoBi",
+		Method:  "GET",
+	}
+
+	rawRsp, err := p.BuildAndPostGatewayUrl(request, "/v1/common/symbols")
+	if err != nil {
+		return nil, err
 	}
 
 	result := common.GetSymbolsResponse{}
-	jsonErr := json.Unmarshal([]byte(getResp), &result)
+	jsonErr := json.Unmarshal([]byte(rawRsp.Data), &result)
 	if jsonErr != nil {
 		return nil, jsonErr
 	}
 	if result.Status == "ok" && result.Data != nil {
 		return result.Data, nil
 	}
-	return nil, errors.New(getResp)
+	return nil, errors.New(rawRsp.Data)
 }
 
 // Get all Supported Currencies

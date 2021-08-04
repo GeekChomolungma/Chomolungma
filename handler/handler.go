@@ -13,7 +13,7 @@ func LocalServer() {
 	r := gin.Default()
 
 	// common status info
-	r.POST("/v1/common/symbols", getSymbols)
+	r.POST("/api/v1/common/symbols", getSymbols)
 
 	// for account info
 	r.POST("/api/v1/account/accountinfo", getAccountInfo)

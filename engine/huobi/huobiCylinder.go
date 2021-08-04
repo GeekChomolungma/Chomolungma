@@ -24,7 +24,7 @@ func (HBCylinder *HuoBiCylinder) Ignite() {
 	httpClientMap = make(map[string]interface{})
 
 	// subscribe the marketinfo
-	flowWindowMarketInfo("btcusdt", Period_1min, 1627896420, 1627960080)
+	flowWindowMarketInfo("btcusdt", Period_1min, 1627896420, 1628042280)
 	subscribeMarketInfo("btcusdt", Period_1min)
 }
 

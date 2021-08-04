@@ -7,10 +7,12 @@ import (
 	"github.com/GeekChomolungma/Chomolungma/config"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/clients"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/account"
+	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/common"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/order"
 	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
 )
 
+// -------------------------------------------------------------ACCOUNT-------------------------------------------------------
 // GetAccountInfo return the account info
 func GetAccountInfo() {
 	httpClient := new(clients.AccountClient).Init(
@@ -21,7 +23,7 @@ func GetAccountInfo() {
 	)
 	resp, err := httpClient.GetAccountInfo()
 	if err != nil {
-		applogger.Error("Get account error: %s", err)
+		applogger.Error("Get account error: %s", err.Error())
 	} else {
 		applogger.Info("Get account, count=%d", len(resp))
 		for _, result := range resp {
@@ -39,14 +41,15 @@ func GetAccountBalance() (*account.AccountBalance, error) {
 	)
 	resp, err := httpClient.GetAccountBalance("3667382")
 	if err != nil {
-		applogger.Error("Cannot get account balance: %s", err)
+		applogger.Error("Cannot get account balance: %s", err.Error())
 		return nil, err
 	} else {
-		applogger.Info("Get account balance, %v", resp)
+		applogger.Info("Got account balance")
 		return resp, nil
 	}
 }
 
+// -------------------------------------------------------------ORDER-------------------------------------------------------
 func PlaceOrder(model, price, amount string) {
 	client := new(clients.OrderClient).Init(
 		config.GatewaySetting.GatewayHost,
@@ -95,4 +98,20 @@ func PlaceOrder(model, price, amount string) {
 			applogger.Error("Place order error: %s", resp.ErrorMessage)
 		}
 	}
+}
+
+// -------------------------------------------------------------COMMON-------------------------------------------------------
+func GetSymbols() ([]common.Symbol, error) {
+	httpClient := new(clients.CommonClient).Init(
+		config.GatewaySetting.GatewayHost,
+		config.HuoBiApiSetting.ApiServerHost,
+	)
+	symbols, err := httpClient.GetSymbols()
+	if err != nil {
+		applogger.Error("Get GetSymbols error: %s", err.Error())
+		return nil, err
+	}
+
+	applogger.Info("Get symbols, count=%d", len(symbols))
+	return symbols, nil
 }
