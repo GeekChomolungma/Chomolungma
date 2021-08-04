@@ -52,7 +52,7 @@ func GetAccountBalance() (*account.AccountBalance, error) {
 }
 
 // -------------------------------------------------------------ORDER-------------------------------------------------------
-func PlaceOrder(model, price, amount string) {
+func PlaceOrder(symbol, model, amount, price, source string) {
 	client := new(clients.OrderClient).Init(
 		config.GatewaySetting.GatewayHost,
 		config.HuoBiApiSetting.AccessKey,
@@ -61,32 +61,59 @@ func PlaceOrder(model, price, amount string) {
 	)
 	request := order.PlaceOrderRequest{
 		AccountId: "3667382",
-		Type:      model, //"buy-limit",
-		Source:    "spot-api",
-		Symbol:    "btcusdt",
+		Symbol:    symbol, //"btcusdt"
+		Type:      model,  //"buy-limit"
+		Source:    source, //"spot-api"
 	}
-	amountSeperates := strings.Split(amount, ".")
-	applogger.Info("model is %s", model)
-	if model == "buy-market" {
-		// usdt scale 8
+
+	applogger.Info("PlaceOrder: Order model is %s", model)
+	s, _ := db.CreateMarketDBSession()
+	collectionName := fmt.Sprintf("%s-%s", "HB", "symbols")
+	DBclient := s.DB("marketinfo").C(collectionName)
+	sameSym := &common.SymbolFloat{}
+	err := DBclient.Find(bson.M{"symbol": symbol}).One(sameSym)
+	if err != nil {
+		applogger.Error("PlaceOrder: Error, there is no symbol: %s could be traded! Please check HuoBi's available symbols", symbol)
+		return
+	}
+
+	switch model {
+	case "buy-market":
+		// get precision of quote-currency
+		// like usdt scale 8
+		amountSeperates := strings.Split(amount, ".")
 		request.Amount = amountSeperates[0]
-	} else {
-		if model == "sell-market" {
-			// btc scale 6
-			rawDecimal := amountSeperates[1]
+
+	case "sell-market":
+		// get precision of base-currency
+		// like btc scale 6
+		amountSeperates := strings.Split(amount, ".")
+		rawDecimal := amountSeperates[1]
+
+		baseCurrencyPrecision := sameSym.AmountPrecision
+		applogger.Info("PlaceOrder: Symbol: %s, the amount precision is %d", symbol, sameSym.AmountPrecision)
+		if len(rawDecimal) < baseCurrencyPrecision {
+			// amount too short
+			request.Amount = amount
+		} else {
+			// cut the amount tail
 			Decimal := rawDecimal[0:6]
 			amount := fmt.Sprintf("%s.%s", amountSeperates[0], Decimal)
 			request.Amount = amount
-			applogger.Info("btc amount to sell is %s", amount)
-		} else {
-			request.Amount = amount
 		}
-	}
+		applogger.Info("btc amount to sell is %s", request.Amount)
 
-	if model == "buy-market" || model == "sell-market" {
-		applogger.Info("market order, no price, req is: %v", request)
-	} else {
+	case "buy-limit":
 		request.Price = price
+		request.Amount = amount
+
+	case "sell-limit":
+		request.Price = price
+		request.Amount = amount
+
+	case "buy-limit-maker":
+	case "sell-limit-maker":
+	default:
 	}
 
 	resp, err := client.PlaceOrder(&request)

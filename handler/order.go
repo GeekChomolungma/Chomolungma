@@ -25,7 +25,7 @@ func placeOrder(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"code": dtos.CANNOT_PARSE_POST_BODY, "msg": "Sorry", "data": err.Error()})
 			return
 		}
-		huobi.PlaceOrder(orderInfo.Model, orderInfo.Price, orderInfo.Amount)
+		huobi.PlaceOrder(orderInfo.Symbol, orderInfo.Model, orderInfo.Amount, orderInfo.Price, orderInfo.Source)
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"code": dtos.AIM_SITE_NOT_EXIST, "msg": "Sorry", "data": err.Error()})
 	}

@@ -27,7 +27,7 @@ func (HBCylinder *HuoBiCylinder) Ignite() {
 	querySymbolsAndWriteDisk()
 
 	// subscribe the marketinfo
-	flowWindowMarketInfo("btcusdt", Period_1min, 1627896420, 1628059200)
+	flowWindowMarketInfo("btcusdt", Period_1min, 1627896420, 1628063100)
 	subscribeMarketInfo("btcusdt", Period_1min)
 }
 
