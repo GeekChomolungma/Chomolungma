@@ -23,8 +23,11 @@ func (HBCylinder *HuoBiCylinder) Ignite() {
 	wsCandlestickClientMap = make(map[string]*marketwebsocketclient.CandlestickWebSocketClient)
 	httpClientMap = make(map[string]interface{})
 
+	// get symbols and write into DB
+	querySymbolsAndWriteDisk()
+
 	// subscribe the marketinfo
-	flowWindowMarketInfo("btcusdt", Period_1min, 1627896420, 1628042280)
+	flowWindowMarketInfo("btcusdt", Period_1min, 1627896420, 1628059200)
 	subscribeMarketInfo("btcusdt", Period_1min)
 }
 

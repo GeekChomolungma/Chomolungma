@@ -5,11 +5,13 @@ import (
 	"strings"
 
 	"github.com/GeekChomolungma/Chomolungma/config"
+	"github.com/GeekChomolungma/Chomolungma/db"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/clients"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/account"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/common"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/order"
 	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
+	"gopkg.in/mgo.v2/bson"
 )
 
 // -------------------------------------------------------------ACCOUNT-------------------------------------------------------
@@ -114,4 +116,45 @@ func GetSymbols() ([]common.Symbol, error) {
 
 	applogger.Info("Get symbols, count=%d", len(symbols))
 	return symbols, nil
+}
+
+func querySymbolsAndWriteDisk() {
+	// connect market db
+	s, err := db.CreateMarketDBSession()
+	collectionName := fmt.Sprintf("%s-%s", "HB", "symbols")
+	client := s.DB("marketinfo").C(collectionName)
+	mgoSessionMap[collectionName] = s
+	if err != nil {
+		applogger.Error("Failed to connection db: %s", err.Error())
+		return
+	}
+
+	symbols, err := GetSymbols()
+	if err != nil {
+		applogger.Error("querySymbolsAndWriteDisk: Get GetSymbols error: %s", err.Error())
+		return
+	}
+
+	for _, s := range symbols {
+		sameSym := &common.SymbolFloat{}
+		err := client.Find(bson.M{"symbol": s.Symbol}).One(sameSym)
+		if err != nil {
+			// if not exist, insert
+			sf := s.SymbolToFloat()
+			err = client.Insert(sf)
+			if err != nil {
+				applogger.Error("querySymbolsAndWriteDisk: Failed to connection db: %s", err.Error())
+			} else {
+				applogger.Info("Success to write symbol %s into db", s.Symbol)
+			}
+		} else {
+			// update it
+			selector := bson.M{"symbol": s.Symbol}
+			sf := s.SymbolToFloat()
+			err := client.Update(selector, sf)
+			if err != nil {
+				applogger.Error("querySymbolsAndWriteDisk: Failed to update symbol: %s", err.Error())
+			}
+		}
+	}
 }

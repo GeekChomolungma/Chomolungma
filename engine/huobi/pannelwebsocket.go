@@ -31,7 +31,7 @@ const (
 func subscribeMarketInfo(symbol string, period periodUnit) {
 	// connect market db
 	s, err := db.CreateMarketDBSession()
-	collectionName := fmt.Sprintf("%s-%s", symbol, string(period))
+	collectionName := fmt.Sprintf("HB-%s-%s", symbol, string(period))
 	client := s.DB("marketinfo").C(collectionName)
 	mgoSessionMap[collectionName+"-subscribeMarketInfo"] = s
 	if err != nil {
@@ -60,7 +60,6 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 						if err != nil {
 							// if not exist, insert
 							// insert new data
-							applogger.Info("Failed to find ID in db, insert the new data.")
 							tickerWrite := t.TickToFloat()
 							err = client.Insert(tickerWrite)
 							if err != nil {
@@ -135,7 +134,7 @@ func flowWindowMarketInfo(symbol string, period periodUnit, startTime int64, toT
 		len(timeWindow), timeWindow)
 	// connect market db
 	s, err := db.CreateMarketDBSession()
-	collectionName := fmt.Sprintf("%s-%s", symbol, string(period))
+	collectionName := fmt.Sprintf("HB-%s-%s", symbol, string(period))
 	client := s.DB("marketinfo").C(collectionName)
 	mgoSessionMap[collectionName+"-flowWindowMarketInfo"] = s
 	if err != nil {
@@ -164,17 +163,16 @@ func flowWindowMarketInfo(symbol string, period periodUnit, startTime int64, toT
 							applogger.Info("Candlestick data, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
 								t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
 
-							ticker := &market.Tick{}
-							err := client.Find(bson.M{"id": t.Id}).One(ticker)
+							tickerRetrive := &market.TickFloat{}
+							err := client.Find(bson.M{"id": t.Id}).One(tickerRetrive)
 							if err != nil {
 								// if not exist, insert
-								applogger.Error("not exist, insert")
 								tickerWrite := t.TickToFloat()
 								err = client.Insert(tickerWrite)
 								if err != nil {
-									applogger.Error("Failed to connection db: %s", err.Error())
+									applogger.Error("FlowWindowMarket: Failed to connection db: %s", err.Error())
 								} else {
-									applogger.Info("Candlestick data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+									applogger.Info("FlowWindowMarket: Candlestick data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
 										t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
 								}
 							}
