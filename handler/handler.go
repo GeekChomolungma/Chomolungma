@@ -14,6 +14,7 @@ func LocalServer() {
 
 	// common status info
 	r.POST("/api/v1/common/symbols", getSymbols)
+	r.POST("/api/v1/common/timestamp", getTimestamp)
 
 	// for account info
 	r.POST("/api/v1/account/accountinfo", getAccountInfo)

@@ -165,14 +165,18 @@ func (p *CommonClient) GetV2ReferenceCurrencies(optionalRequest common.GetV2Refe
 // Get Current Timestamp
 // This endpoint returns the current timestamp, i.e. the number of milliseconds that have elapsed since 00:00:00 UTC on 1 January 1970.
 func (p *CommonClient) GetTimestamp() (int, error) {
-	url := p.publicUrlBuilder.Build("/v1/common/timestamp", nil)
-	getResp, getErr := internal.HttpGet(url)
-	if getErr != nil {
-		return 0, getErr
+	request := &dtos.BaseReqModel{
+		AimSite: "HuoBi",
+		Method:  "GET",
+	}
+
+	rawRsp, err := p.BuildAndPostGatewayUrl(request, "/v1/common/timestamp")
+	if err != nil {
+		return 0, err
 	}
 
 	result := common.GetTimestampResponse{}
-	jsonErr := json.Unmarshal([]byte(getResp), &result)
+	jsonErr := json.Unmarshal([]byte(rawRsp.Data), &result)
 
 	if jsonErr != nil {
 		return 0, jsonErr
@@ -180,5 +184,5 @@ func (p *CommonClient) GetTimestamp() (int, error) {
 	if result.Status == "ok" && result.Data != 0 {
 		return result.Data, nil
 	}
-	return 0, errors.New(getResp)
+	return 0, errors.New(rawRsp.Data)
 }

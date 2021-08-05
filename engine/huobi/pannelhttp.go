@@ -185,3 +185,19 @@ func querySymbolsAndWriteDisk() {
 		}
 	}
 }
+
+func GetTimestamp() (int, error) {
+	httpClient := new(clients.CommonClient).Init(
+		config.GatewaySetting.GatewayHost,
+		config.HuoBiApiSetting.ApiServerHost,
+	)
+	timeMillsecs, err := httpClient.GetTimestamp()
+	timestamp := timeMillsecs / 1000
+	if err != nil {
+		applogger.Error("Get GetTimestamp error: %s", err.Error())
+		return 0, err
+	}
+
+	applogger.Info("GetTimestamp in second: %d", timestamp)
+	return timestamp, nil
+}

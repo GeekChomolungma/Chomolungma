@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/market"
 	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
 	"gopkg.in/mgo.v2"
@@ -8,6 +10,17 @@ import (
 )
 
 func main() {
+
+	var t *market.Tick
+	if t == nil {
+		fmt.Println("t is nil", t)
+	}
+
+	tt := &market.Tick{}
+	if tt == nil {
+		fmt.Println("tt is nil", tt)
+	}
+	fmt.Println("tt is not nil", tt)
 
 	tmp := &market.Tick{
 		Id:    1626453720,
