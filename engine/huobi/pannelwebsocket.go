@@ -11,7 +11,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-var tmp *market.Tick
+var PreviousSyncTimeMap = make(map[string]int64)
 
 type periodUnit string
 
@@ -29,6 +29,8 @@ const (
 )
 
 func subscribeMarketInfo(symbol string, period periodUnit) {
+	var previousTick *market.Tick
+
 	// connect market db
 	s, err := db.CreateMarketDBSession()
 	collectionName := fmt.Sprintf("HB-%s-%s", symbol, string(period))
@@ -69,23 +71,27 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 									t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
 							}
 
-							if tmp != nil {
+							if previousTick != nil {
 								applogger.Info("Previous Data is: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-									tmp.Id, tmp.Count, tmp.Vol, tmp.Open, tmp.Count, tmp.Low, tmp.High)
+									previousTick.Id, previousTick.Count, previousTick.Vol,
+									previousTick.Open, previousTick.Count, previousTick.Low, previousTick.High)
 
 								// update the previous data
-								selector := bson.M{"id": tmp.Id}
-								tmpFloat := tmp.TickToFloat()
-								err := client.Update(selector, tmpFloat)
+								selector := bson.M{"id": previousTick.Id}
+								previousTickFloat := previousTick.TickToFloat()
+								err := client.Update(selector, previousTickFloat)
 								if err != nil {
 									applogger.Error("Failed to update to db: %s", err.Error())
 								} else {
-									applogger.Info("Candlestick update to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-										tmp.Id, tmp.Count, tmp.Vol, tmp.Open, tmp.Close, tmp.Low, tmp.High)
+									applogger.Info("Previous Data update to db")
 								}
 							}
 						}
-						tmp = t
+						// update previous tick
+						previousTick = t
+
+						// add PreviousSyncTime into map
+						PreviousSyncTimeMap[collectionName] = t.Id
 					}
 
 					if resp.Data != nil {
@@ -165,14 +171,25 @@ func flowWindowMarketInfo(symbol string, period periodUnit, startTime int64, toT
 
 							tickerRetrive := &market.TickFloat{}
 							err := client.Find(bson.M{"id": t.Id}).One(tickerRetrive)
+							tickerWrite := t.TickToFloat()
 							if err != nil {
 								// if not exist, insert
-								tickerWrite := t.TickToFloat()
 								err = client.Insert(tickerWrite)
 								if err != nil {
 									applogger.Error("FlowWindowMarket: Failed to connection db: %s", err.Error())
 								} else {
 									applogger.Info("FlowWindowMarket: Candlestick data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+										t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
+								}
+							} else {
+								// if exist, update it for sync.
+								// startTime should be equal to previousTick.Id
+								selector := bson.M{"id": tickerWrite.Id}
+								err := client.Update(selector, tickerWrite)
+								if err != nil {
+									applogger.Error("FlowWindowMarket: Failed to update to db: %s", err.Error())
+								} else {
+									applogger.Info("FlowWindowMarket: Found Previous Data, Update to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
 										t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
 								}
 							}
