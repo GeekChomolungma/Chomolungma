@@ -62,9 +62,9 @@ func PlaceOrder(symbol, model, amount, price, source string) {
 	)
 	request := order.PlaceOrderRequest{
 		AccountId: "3667382",
-		Symbol:    symbol, //"btcusdt"
-		Type:      model,  //"buy-limit"
-		Source:    source, //"spot-api"
+		Symbol:    symbol, // "btcusdt"
+		Type:      model,  // "buy-limit"
+		Source:    source, // "spot-api"
 	}
 
 	applogger.Info("PlaceOrder: Order model is %s", model)
@@ -137,13 +137,38 @@ func PlaceOrder(symbol, model, amount, price, source string) {
 		request.Amount = Amt
 		applogger.Info("sell-market, btc amount to sell is %s", request.Amount)
 
-	case "buy-limit":
-		request.Price = price
-		request.Amount = amount
+	case "buy-limit", "sell-limit":
+		// fistly, check amount
+		// check min amount
+		passed, err := checkMinAndMaxValAmt(amount, limitOrderMinOrderAmt, limitOrderMaxOrderAmt)
+		if err != nil || !passed {
+			applogger.Error("limit: check amount min or max not passed.")
+			return
+		}
+		// check amount precision
+		Amt, amtErr := checkAmtPrecision(amount, baseCurLimitPrecision)
+		if amtErr != nil {
+			applogger.Error("limit: baseCurLimitPrecision error: %s", amtErr.Error())
+			return
+		}
+		request.Amount = Amt
+		applogger.Info("limit, amount is %s", request.Amount)
 
-	case "sell-limit":
-		request.Price = price
-		request.Amount = amount
+		// then, check price
+		Price, priceErr := checkPricePrecision(price, qutoCurLimitPrecision)
+		if priceErr != nil {
+			applogger.Error("limit: qutoCurLimitPrecision error: %s", amtErr.Error())
+			return
+		}
+		request.Price = Price
+		applogger.Info("limit, price is %s", request.Price)
+
+		// finally, check production of price * amount
+		passed = checkProduction(request.Amount, request.Price, minOrderValue, buyMarketMaxOrderValue)
+		if !passed {
+			applogger.Error("limit: check production not passed, min value is %f, max value is %f", minOrderValue, buyMarketMaxOrderValue)
+			return
+		}
 
 	case "buy-limit-maker":
 	case "sell-limit-maker":
@@ -163,19 +188,29 @@ func PlaceOrder(symbol, model, amount, price, source string) {
 	}
 }
 
+func checkPricePrecision(price string, precision int) (string, error) {
+	var Price string
+	priceSeperates := strings.Split(price, ".")
+	rawDecimal := priceSeperates[1]
+	if len(rawDecimal) >= precision {
+		// cut the price tail
+		Decimal := rawDecimal[0:precision]
+		price = fmt.Sprintf("%s.%s", priceSeperates[0], Decimal)
+	}
+	Price = price
+	return Price, nil
+}
+
 func checkAmtPrecision(amount string, precision int) (string, error) {
 	var Amount string
 	amountSeperates := strings.Split(amount, ".")
 	rawDecimal := amountSeperates[1]
-	if len(rawDecimal) < precision {
-		// amount too short
-		Amount = amount
-	} else {
+	if len(rawDecimal) >= precision {
 		// cut the amount tail
 		Decimal := rawDecimal[0:precision]
-		amount := fmt.Sprintf("%s.%s", amountSeperates[0], Decimal)
-		Amount = amount
+		amount = fmt.Sprintf("%s.%s", amountSeperates[0], Decimal)
 	}
+	Amount = amount
 	return Amount, nil
 }
 
@@ -185,10 +220,21 @@ func checkMinAndMaxValAmt(amount string, minV, maxV float64) (bool, error) {
 		return false, err
 	}
 	if amountF < minV || amountF > maxV {
-		// market model, amount over limit.
+		// amount over limit.
 		return false, nil
 	}
 	return true, nil
+}
+
+func checkProduction(amount, price string, minV, maxV float64) bool {
+	amountF, _ := strconv.ParseFloat(amount, 64)
+	priceF, _ := strconv.ParseFloat(price, 64)
+	product := amountF * priceF
+	if product < minV || product > maxV {
+		// value over limit.
+		return false
+	}
+	return true
 }
 
 // -------------------------------------------------------------COMMON-------------------------------------------------------
