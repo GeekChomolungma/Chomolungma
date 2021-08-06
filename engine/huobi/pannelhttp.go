@@ -2,6 +2,7 @@ package huobi
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/GeekChomolungma/Chomolungma/config"
@@ -77,31 +78,64 @@ func PlaceOrder(symbol, model, amount, price, source string) {
 		return
 	}
 
+	// precision setting
+	baseCurLimitPrecision := sameSym.AmountPrecision // for limit
+	qutoCurLimitPrecision := sameSym.PricePrecision  // for limit
+	amountMarketPrecision := sameSym.AmountPrecision // for market sell
+	valueMarketPrecision := sameSym.ValuePrecision   // for market buy
+	applogger.Info("PlaceOrder: Symbol: %s, LIMIT Model: [amount precision %d, price precision: %d]. MARKET Model: [amount precision %d, value precision: %d]. MARKET Model",
+		symbol, baseCurLimitPrecision, qutoCurLimitPrecision, amountMarketPrecision, valueMarketPrecision)
+
+	// min and max value setting
+	limitOrderMinOrderAmt := sameSym.LimitOrderMinOrderAmt
+	limitOrderMaxOrderAmt := sameSym.LimitOrderMaxOrderAmt
+	sellMarketMinOrderAmt := sameSym.SellMarketMinOrderAmt
+	sellMarketMaxOrderAmt := sameSym.SellMarketMaxOrderAmt
+	buyMarketMaxOrderValue := sameSym.BuyMarketMaxOrderValue
+	minOrderValue := sameSym.MinOrderValue
+	maxOrderValue := sameSym.MaxOrderValue
+	applogger.Info("PlaceOrder: Symbol: %s, limitOrderMinOrderAmt:%f, limitOrderMaxOrderAmt:%f, sellMarketMinOrderAmt: %f, sellMarketMaxOrderAmt: %f, buyMarketMaxOrderValue:%f, minOrderValue:%f, maxOrderValue:%f",
+		symbol,
+		limitOrderMinOrderAmt, limitOrderMaxOrderAmt, sellMarketMinOrderAmt, sellMarketMaxOrderAmt,
+		buyMarketMaxOrderValue,
+		minOrderValue, maxOrderValue)
+
 	switch model {
 	case "buy-market":
 		// get precision of quote-currency
 		// like usdt scale 8
-		amountSeperates := strings.Split(amount, ".")
-		request.Amount = amountSeperates[0]
+		// check min amount for buy
+		passed, err := checkMinAndMaxValAmt(amount, minOrderValue, buyMarketMaxOrderValue)
+		if err != nil || !passed {
+			applogger.Error("buy-market: check min or max not passed.")
+			return
+		}
+		// check amount precision
+		Amt, amtErr := checkAmtPrecision(amount, valueMarketPrecision)
+		if amtErr != nil {
+			applogger.Error("buy-market: checkAmtPrecision error: %s", amtErr.Error())
+			return
+		}
+		request.Amount = Amt
+		applogger.Info("buy-market, usdt amount used to buy is %s", request.Amount)
 
 	case "sell-market":
 		// get precision of base-currency
 		// like btc scale 6
-		amountSeperates := strings.Split(amount, ".")
-		rawDecimal := amountSeperates[1]
-
-		baseCurrencyPrecision := sameSym.AmountPrecision
-		applogger.Info("PlaceOrder: Symbol: %s, the amount precision is %d", symbol, baseCurrencyPrecision)
-		if len(rawDecimal) < baseCurrencyPrecision {
-			// amount too short
-			request.Amount = amount
-		} else {
-			// cut the amount tail
-			Decimal := rawDecimal[0:baseCurrencyPrecision]
-			amount := fmt.Sprintf("%s.%s", amountSeperates[0], Decimal)
-			request.Amount = amount
+		// check min amount for sell
+		passed, err := checkMinAndMaxValAmt(amount, sellMarketMinOrderAmt, sellMarketMaxOrderAmt)
+		if err != nil || !passed {
+			applogger.Error("sell-market: check min or max not passed.")
+			return
 		}
-		applogger.Info("btc amount to sell is %s", request.Amount)
+		// check amount precision
+		Amt, amtErr := checkAmtPrecision(amount, amountMarketPrecision)
+		if amtErr != nil {
+			applogger.Error("sell-market: checkAmtPrecision error: %s", amtErr.Error())
+			return
+		}
+		request.Amount = Amt
+		applogger.Info("sell-market, btc amount to sell is %s", request.Amount)
 
 	case "buy-limit":
 		request.Price = price
@@ -127,6 +161,34 @@ func PlaceOrder(symbol, model, amount, price, source string) {
 			applogger.Error("Place order error: %s", resp.ErrorMessage)
 		}
 	}
+}
+
+func checkAmtPrecision(amount string, precision int) (string, error) {
+	var Amount string
+	amountSeperates := strings.Split(amount, ".")
+	rawDecimal := amountSeperates[1]
+	if len(rawDecimal) < precision {
+		// amount too short
+		Amount = amount
+	} else {
+		// cut the amount tail
+		Decimal := rawDecimal[0:precision]
+		amount := fmt.Sprintf("%s.%s", amountSeperates[0], Decimal)
+		Amount = amount
+	}
+	return Amount, nil
+}
+
+func checkMinAndMaxValAmt(amount string, minV, maxV float64) (bool, error) {
+	amountF, err := strconv.ParseFloat(amount, 64)
+	if err != nil {
+		return false, err
+	}
+	if amountF < minV || amountF > maxV {
+		// market model, amount over limit.
+		return false, nil
+	}
+	return true, nil
 }
 
 // -------------------------------------------------------------COMMON-------------------------------------------------------
