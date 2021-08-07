@@ -211,20 +211,30 @@ func (p *OrderClient) CancelOrdersByIds(request *order.CancelOrdersByIdsRequest)
 
 // Returns the detail of one order by order id
 func (p *OrderClient) GetOrderById(orderId string) (*order.GetOrderResponse, error) {
-	path := fmt.Sprintf("/v1/order/orders/%s", orderId)
-	url := p.privateUrlBuilder.Build("GET", path, nil)
-	getResp, getErr := internal.HttpGet(url)
-	if getErr != nil {
-		return nil, getErr
+
+	requestGateway := &dtos.BaseReqModel{
+		AimSite: "HuoBi",
+		Method:  "GET",
+		Body:    "",
 	}
 
-	result := order.GetOrderResponse{}
-	jsonErr := json.Unmarshal([]byte(getResp), &result)
+	// build gateway url and post it
+	originURL := fmt.Sprintf("/v1/order/orders/%s", orderId)
+	rawRsp, err := p.BuildAndPostGatewayUrl(requestGateway, originURL)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &order.GetOrderResponse{}
+	jsonErr := json.Unmarshal([]byte(rawRsp.Data), &result)
 	if jsonErr != nil {
 		return nil, jsonErr
 	}
+	if result.Status == "ok" {
+		return result, nil
+	}
 
-	return &result, nil
+	return nil, errors.New(rawRsp.Data)
 }
 
 // Returns the detail of one order by client order id

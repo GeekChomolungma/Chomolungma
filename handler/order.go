@@ -52,3 +52,25 @@ func cancelOrderById(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": dtos.AIM_SITE_NOT_EXIST, "msg": "Sorry", "data": err.Error()})
 	}
 }
+
+func getOrderById(c *gin.Context) {
+	var Req dtos.HttpReqModel
+	err := c.Bind(&Req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": dtos.CANNOT_PARSE_POST_BODY, "msg": "Sorry", "data": err.Error()})
+		return
+	}
+
+	switch Req.AimSite {
+	case "HuoBi":
+		orderQuery := &dtos.OrderQuery{}
+		err = jsoniter.UnmarshalFromString(Req.Body, orderQuery)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"code": dtos.CANNOT_PARSE_POST_BODY, "msg": "Sorry", "data": err.Error()})
+			return
+		}
+		huobi.GetOrderById(orderQuery.OrderID)
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"code": dtos.AIM_SITE_NOT_EXIST, "msg": "Sorry", "data": err.Error()})
+	}
+}

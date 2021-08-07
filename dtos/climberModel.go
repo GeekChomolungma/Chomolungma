@@ -14,6 +14,10 @@ type OrderCancel struct {
 	OrderID string `json:"orderid"`
 }
 
+type OrderQuery struct {
+	OrderID string `json:"orderid"`
+}
+
 // CurrencyBalanceReq request the currency's balance
 type CurrencyBalanceReq struct {
 	Currency string `json:"currency"`

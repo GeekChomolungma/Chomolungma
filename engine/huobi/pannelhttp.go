@@ -257,6 +257,26 @@ func CancelOrderById(orderID string) {
 	}
 }
 
+func GetOrderById(orderID string) {
+	client := new(clients.OrderClient).Init(
+		config.GatewaySetting.GatewayHost,
+		config.HuoBiApiSetting.AccessKey,
+		config.HuoBiApiSetting.SecretKey,
+		config.HuoBiApiSetting.ApiServerHost,
+	)
+	resp, err := client.GetOrderById(orderID)
+	if err != nil {
+		applogger.Error(err.Error())
+	} else {
+		switch resp.Status {
+		case "ok":
+			applogger.Info("Query order successfully, order info: %v", resp.Data)
+		case "error":
+			applogger.Info("Query order error: %s", resp.ErrorMessage)
+		}
+	}
+}
+
 // -------------------------------------------------------------COMMON-------------------------------------------------------
 func GetSymbols() ([]common.Symbol, error) {
 	httpClient := new(clients.CommonClient).Init(
