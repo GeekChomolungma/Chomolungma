@@ -22,6 +22,7 @@ func LocalServer() {
 
 	// order action
 	r.POST("/api/v1/order/placeorder", placeOrder)
+	r.POST("/api/v1/order/cancelorder", cancelOrderById)
 
 	// server run!
 	r.Run(config.ServerSetting.Host)

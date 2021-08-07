@@ -71,8 +71,7 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 							if err != nil {
 								applogger.Error("Failed to Insert data : %s", err.Error())
 							} else {
-								applogger.Info("Write to db success, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-									t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
+								applogger.Info("New Data       Pushed into DB: id: %d", t.Id)
 							}
 
 							if previousTick != nil {
@@ -81,9 +80,9 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 								previousTickFloat := previousTick.TickToFloat()
 								err := client.Update(selector, previousTickFloat)
 								if err != nil {
-									applogger.Error("Failed to update Previous data to db: %s", err.Error())
+									applogger.Error("Failed to Update Previous Data to db: %s", err.Error())
 								} else {
-									applogger.Info("Previous data Updated into DB: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+									applogger.Info("Previous Data Updated into DB: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
 										previousTick.Id, previousTick.Count, previousTick.Vol,
 										previousTick.Open, previousTick.Count, previousTick.Low, previousTick.High)
 								}

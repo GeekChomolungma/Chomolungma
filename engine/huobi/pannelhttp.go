@@ -237,6 +237,26 @@ func checkProduction(amount, price string, minV, maxV float64) bool {
 	return true
 }
 
+func CancelOrderById(orderID string) {
+	client := new(clients.OrderClient).Init(
+		config.GatewaySetting.GatewayHost,
+		config.HuoBiApiSetting.AccessKey,
+		config.HuoBiApiSetting.SecretKey,
+		config.HuoBiApiSetting.ApiServerHost,
+	)
+	resp, err := client.CancelOrderById(orderID)
+	if err != nil {
+		applogger.Error(err.Error())
+	} else {
+		switch resp.Status {
+		case "ok":
+			applogger.Info("Cancel order successfully, order id: %s", resp.Data)
+		case "error":
+			applogger.Info("Cancel order error: %s", resp.ErrorMessage)
+		}
+	}
+}
+
 // -------------------------------------------------------------COMMON-------------------------------------------------------
 func GetSymbols() ([]common.Symbol, error) {
 	httpClient := new(clients.CommonClient).Init(

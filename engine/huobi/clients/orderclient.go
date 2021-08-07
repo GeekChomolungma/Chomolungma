@@ -34,7 +34,7 @@ func (p *OrderClient) BuildAndPostGatewayUrl(request *dtos.BaseReqModel, originU
 		return nil, jsonErr
 	}
 
-	// build url to gate way
+	// build url to gateway
 	url := fmt.Sprintf("http://%s/api/v1/Chomolungma/entrypoint", p.gatewayHost)
 	gatewayRsp, postErr := internal.HttpPost(url, postBody)
 	if postErr != nil {
@@ -110,20 +110,30 @@ func (p *OrderClient) PlaceOrders(request []order.PlaceOrderRequest) (*order.Pla
 
 // Cancel an order by order id
 func (p *OrderClient) CancelOrderById(orderId string) (*order.CancelOrderByIdResponse, error) {
-	path := fmt.Sprintf("/v1/order/orders/%s/submitcancel", orderId)
-	url := p.privateUrlBuilder.Build("POST", path, nil)
-	postResp, postErr := internal.HttpPost(url, "")
-	if postErr != nil {
-		return nil, postErr
+	// create post body to gateway
+	requestGateway := &dtos.BaseReqModel{
+		AimSite: "HuoBi",
+		Method:  "POST",
+		Body:    "",
 	}
 
-	result := order.CancelOrderByIdResponse{}
-	jsonErr := json.Unmarshal([]byte(postResp), &result)
+	// build gateway url and post it
+	originURL := fmt.Sprintf("/v1/order/orders/%s/submitcancel", orderId)
+	rawRsp, err := p.BuildAndPostGatewayUrl(requestGateway, originURL)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &order.CancelOrderByIdResponse{}
+	jsonErr := jsoniter.Unmarshal([]byte(rawRsp.Data), result)
 	if jsonErr != nil {
 		return nil, jsonErr
 	}
+	if result.Status == "ok" {
+		return result, nil
+	}
 
-	return &result, nil
+	return nil, errors.New(rawRsp.Data)
 }
 
 // Cancel an order by client order id
