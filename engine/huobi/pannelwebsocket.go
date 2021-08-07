@@ -6,7 +6,10 @@ import (
 	"github.com/GeekChomolungma/Chomolungma/config"
 	"github.com/GeekChomolungma/Chomolungma/db"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/clients/marketwebsocketclient"
+	"github.com/GeekChomolungma/Chomolungma/engine/huobi/clients/orderwebsocketclient"
+	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/auth"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/market"
+	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/order"
 	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -28,6 +31,7 @@ const (
 	Period_1year periodUnit = "1year"
 )
 
+// -------------------------------------------------------------MARKET-------------------------------------------------------
 func subscribeMarketInfo(symbol string, period periodUnit) {
 	var previousTick *market.Tick
 
@@ -249,4 +253,83 @@ func makeTimeWindow(period periodUnit, startTime int64, toTime int64) ([][]int64
 		timeWindow = append(timeWindow, timeElement)
 	}
 	return timeWindow, nil
+}
+
+// -------------------------------------------------------------ORDER-------------------------------------------------------
+func subOrderUpdateV2(symbol, accountID string) {
+	// connect market db
+	s, err := db.CreateRootDBSession()
+	collectionName := fmt.Sprintf("HB-%s-%s", accountID, symbol)
+	dbClient := s.DB("order").C(collectionName)
+	mgoSessionMap[collectionName] = s
+	if err != nil {
+		applogger.Error("Failed to connection db: %s", err.Error())
+		return
+	}
+
+	// Initialize a new instance
+	wsClient := new(orderwebsocketclient.SubscribeOrderWebSocketV2Client).Init(
+		config.GatewaySetting.GatewayHost,
+		config.HuoBiApiSetting.AccessKey,
+		config.HuoBiApiSetting.SecretKey,
+		config.HuoBiApiSetting.ApiServerHost,
+	)
+
+	// Set the callback handlers
+	wsClient.SetHandler(
+		// Connected handler
+		func(resp *auth.WebSocketV2AuthenticationResponse) {
+			if resp.IsSuccess() {
+				// Subscribe if authentication passed
+				wsClient.Subscribe(symbol, "1149")
+			} else {
+				applogger.Error("Authentication error, code: %d, message:%s", resp.Code, resp.Message)
+			}
+		},
+		// Response handler
+		func(resp interface{}) {
+			subResponse, ok := resp.(order.SubscribeOrderV2Response)
+			if ok {
+				if subResponse.Action == "sub" {
+					if subResponse.IsSuccess() {
+						applogger.Info("Subscription topic %s successfully", subResponse.Ch)
+					} else {
+						applogger.Error("Subscription topic %s error, code: %d, message: %s", subResponse.Ch, subResponse.Code, subResponse.Message)
+					}
+				} else if subResponse.Action == "push" {
+					if subResponse.Data != nil {
+						o := subResponse.Data
+						oInDB := &order.OrderInfo{}
+						err := dbClient.Find(bson.M{"orderid": o.OrderId}).One(oInDB)
+						if err != nil {
+							// not exist in db
+							err = dbClient.Insert(o)
+							if err != nil {
+								applogger.Error("Failed to Insert data : %s", err.Error())
+							} else {
+								applogger.Info("Order created, event: %s, symbol: %s, type: %s, status: %s",
+									o.EventType, o.Symbol, o.Type, o.OrderStatus)
+							}
+						} else {
+							// update
+							selector := bson.M{"orderid": o.OrderId}
+							err := dbClient.Update(selector, o)
+							if err != nil {
+								applogger.Error("Failed to Update data : %s", err.Error())
+							} else {
+								applogger.Info("Order updated, event: %s, symbol: %s, type: %s, status: %s",
+									o.EventType, o.Symbol, o.Type, o.OrderStatus)
+							}
+						}
+					}
+				}
+			} else {
+				applogger.Warn("Received unknown response: %v", resp)
+			}
+		})
+
+	// Connect to the server and wait for the handler to handle the response
+	wsClient.Connect(true)
+	// HB-AccountID-Symbol
+	wsOrderV2ClientMap["HB-3667382-btcusdt"] = wsClient
 }

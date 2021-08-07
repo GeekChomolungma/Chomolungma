@@ -23,8 +23,9 @@ type AuthenticationV2ResponseHandler func(resp *auth.WebSocketV2AuthenticationRe
 
 // The base class that responsible to get data from websocket authentication v2
 type WebSocketV2ClientBase struct {
-	host string
-	conn *websocket.Conn
+	host        string
+	gatewayHost string
+	conn        *websocket.Conn
 
 	authenticationResponseHandler AuthenticationV2ResponseHandler
 	messageHandler                MessageHandler
@@ -40,8 +41,9 @@ type WebSocketV2ClientBase struct {
 }
 
 // Initializer
-func (p *WebSocketV2ClientBase) Init(accessKey string, secretKey string, host string) *WebSocketV2ClientBase {
+func (p *WebSocketV2ClientBase) Init(gatewayHost string, accessKey string, secretKey string, host string) *WebSocketV2ClientBase {
 	p.host = host
+	p.gatewayHost = gatewayHost
 	p.stopReadChannel = make(chan int, 1)
 	p.stopTickerChannel = make(chan int, 1)
 	p.requestBuilder = new(requestbuilder.WebSocketV2RequestBuilder).Init(accessKey, secretKey, host, websocketV2Path)
@@ -96,7 +98,7 @@ func (p *WebSocketV2ClientBase) Close() {
 // connect to server
 func (p *WebSocketV2ClientBase) connectWebSocket() {
 	var err error
-	url := fmt.Sprintf("wss://%s%s", p.host, websocketV2Path)
+	url := fmt.Sprintf("ws://%s%s", p.gatewayHost, websocketV2Path)
 	applogger.Debug("WebSocket connecting...")
 	p.conn, _, err = websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {

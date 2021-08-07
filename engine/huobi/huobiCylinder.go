@@ -7,6 +7,7 @@ import (
 	"github.com/GeekChomolungma/Chomolungma/db"
 	"github.com/GeekChomolungma/Chomolungma/dtos"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/clients/marketwebsocketclient"
+	"github.com/GeekChomolungma/Chomolungma/engine/huobi/clients/orderwebsocketclient"
 	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -14,6 +15,7 @@ import (
 
 var mgoSessionMap map[string]*mgo.Session
 var wsCandlestickClientMap map[string]*marketwebsocketclient.CandlestickWebSocketClient
+var wsOrderV2ClientMap map[string]*orderwebsocketclient.SubscribeOrderWebSocketV2Client
 var httpClientMap map[string]interface{}
 
 type HuoBiCylinder struct {
@@ -24,6 +26,7 @@ type HuoBiCylinder struct {
 func (HBCylinder *HuoBiCylinder) Ignite() {
 	mgoSessionMap = make(map[string]*mgo.Session)
 	wsCandlestickClientMap = make(map[string]*marketwebsocketclient.CandlestickWebSocketClient)
+	wsOrderV2ClientMap = make(map[string]*orderwebsocketclient.SubscribeOrderWebSocketV2Client)
 	httpClientMap = make(map[string]interface{})
 
 	// get symbols and write into DB
@@ -46,6 +49,7 @@ func (HBCylinder *HuoBiCylinder) Ignite() {
 
 	flowWindowMarketInfo("btcusdt", Period_1min, startTimeInt64, endTimeInt64)
 	subscribeMarketInfo("btcusdt", Period_1min)
+	subOrderUpdateV2("btcusdt", "3667382")
 }
 
 func GetSyncStartTimestamp(collection string) (int64, error) {
@@ -69,7 +73,8 @@ func GetSyncStartTimestamp(collection string) (int64, error) {
 
 // Flameout elegantly stop the Cylinder
 func (HBCylinder *HuoBiCylinder) Flameout() {
-	CandlestickClientFlameout()
+	CandlestickClientFlameout() // market info
+	OrderV2ClientFlameout()     // order info
 
 	time.Sleep(time.Duration(2) * time.Second)
 	for _, session := range mgoSessionMap {
@@ -113,8 +118,17 @@ func CandlestickClientFlameout() {
 
 	for collectionName, client := range wsCandlestickClientMap {
 		sp := strings.Split(collectionName, "-")
-		client.UnSubscribe(sp[0], string(sp[1]), "2118")
+		client.UnSubscribe(sp[1], sp[2], "2118")
 		client.Close()
-		applogger.Info("Client: %s closed", collectionName)
+		applogger.Info("MarketInfo Client: %s closed", collectionName)
+	}
+}
+
+func OrderV2ClientFlameout() {
+	for collectionName, client := range wsOrderV2ClientMap {
+		sp := strings.Split(collectionName, "-")
+		client.UnSubscribe(sp[2], "1149")
+		client.Close()
+		applogger.Info("Order V2 Client: %s closed", collectionName)
 	}
 }
