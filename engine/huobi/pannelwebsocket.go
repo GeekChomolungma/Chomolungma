@@ -76,18 +76,16 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 							}
 
 							if previousTick != nil {
-								applogger.Info("Previous Data is: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-									previousTick.Id, previousTick.Count, previousTick.Vol,
-									previousTick.Open, previousTick.Count, previousTick.Low, previousTick.High)
-
 								// update the previous data
 								selector := bson.M{"id": previousTick.Id}
 								previousTickFloat := previousTick.TickToFloat()
 								err := client.Update(selector, previousTickFloat)
 								if err != nil {
-									applogger.Error("Failed to update to db: %s", err.Error())
+									applogger.Error("Failed to update Previous data to db: %s", err.Error())
 								} else {
-									applogger.Info("Previous Data update to db")
+									applogger.Info("Previous data Updated into DB: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+										previousTick.Id, previousTick.Count, previousTick.Vol,
+										previousTick.Open, previousTick.Count, previousTick.Low, previousTick.High)
 								}
 							}
 						}
