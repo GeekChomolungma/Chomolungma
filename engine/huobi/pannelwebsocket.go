@@ -58,8 +58,8 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 				if &resp != nil {
 					if resp.Tick != nil {
 						t := resp.Tick
-						applogger.Info("Candlestick update, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-							t.Id, t.Count, t.Vol, t.Open, t.Close, t.Low, t.High)
+						// applogger.Info("Candlestick update, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+						// 	t.Id, t.Count, t.Vol, t.Open, t.Close, t.Low, t.High)
 
 						tickerRetrive := &market.TickFloat{}
 						err := client.Find(bson.M{"id": t.Id}).One(tickerRetrive)

@@ -1,26 +1,27 @@
 package applogger
 
 import (
+	"os"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"os"
 )
 
 var sugaredLogger *zap.SugaredLogger
 var atomicLevel zap.AtomicLevel
 
 func init() {
-	encoderCfg := zapcore.EncoderConfig {
-		TimeKey:		"time",
-		MessageKey:     "msg",
-		LevelKey:       "level",
-		EncodeLevel:    zapcore.CapitalColorLevelEncoder,
-		EncodeTime:     zapcore.ISO8601TimeEncoder,
+	encoderCfg := zapcore.EncoderConfig{
+		TimeKey:     "time",
+		MessageKey:  "msg",
+		LevelKey:    "level",
+		EncodeLevel: zapcore.CapitalColorLevelEncoder,
+		EncodeTime:  zapcore.ISO8601TimeEncoder,
 	}
 
 	// define default level as debug level
 	atomicLevel = zap.NewAtomicLevel()
-	atomicLevel.SetLevel(zapcore.DebugLevel)
+	atomicLevel.SetLevel(zapcore.InfoLevel)
 
 	core := zapcore.NewCore(zapcore.NewConsoleEncoder(encoderCfg), os.Stdout, atomicLevel)
 	sugaredLogger = zap.New(core).Sugar()
