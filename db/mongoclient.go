@@ -24,6 +24,14 @@ func CreateAccountDBSession() (*mgo.Session, error) {
 	return mongo, nil
 }
 
+func CreateRootDBSession() (*mgo.Session, error) {
+	mongo, err := mgo.Dial(config.MongoSetting.RootUrl)
+	if err != nil {
+		return nil, err
+	}
+	return mongo, nil
+}
+
 type Student struct {
 	Name   string
 	Age    int

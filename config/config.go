@@ -9,6 +9,7 @@ import (
 type MongoConf struct {
 	MarketUrl  string
 	AccountUrl string
+	RootUrl    string
 }
 
 var MongoSetting = &MongoConf{}
