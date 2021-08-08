@@ -35,7 +35,7 @@ func (HBCylinder *HuoBiCylinder) Ignite() {
 
 	// subscribe the marketinfo
 	// query sync time
-	startTimeInt64, err := GetSyncStartTimestamp("HB-btcusdt-1min")
+	startTimeInt64, err := GetSyncStartTimestamp("HB-ethusdt-1min")
 	if err != nil {
 		applogger.Error("Ignite Huobi Server error: Can not connect mongodb for timestamp: %s", err.Error())
 		return
@@ -47,16 +47,24 @@ func (HBCylinder *HuoBiCylinder) Ignite() {
 		return
 	}
 	endTimeInt64 := int64(endTime + 60)
-	flowWindowMarketInfo("btcusdt", Period_1min, startTimeInt64, endTimeInt64)
-	subscribeMarketInfo("btcusdt", Period_1min)
+	flowWindowMarketInfo("ethusdt", Period_1min, startTimeInt64, endTimeInt64)
+	subscribeMarketInfo("ethusdt", Period_1min)
 
-	startTimeInt64, err = GetSyncStartTimestamp("HB-ethusdt-1min")
+	startTimeInt64, err = GetSyncStartTimestamp("HB-btcusdt-1min")
 	if err != nil {
 		applogger.Error("Ignite Huobi Server error: Can not connect mongodb for timestamp: %s", err.Error())
 		return
 	}
-	flowWindowMarketInfo("ethusdt", Period_1min, startTimeInt64, endTimeInt64)
-	subscribeMarketInfo("ethusdt", Period_1min)
+	flowWindowMarketInfo("btcusdt", Period_1min, startTimeInt64, endTimeInt64)
+	subscribeMarketInfo("btcusdt", Period_1min)
+
+	startTimeInt64, err = GetSyncStartTimestamp("HB-htusdt-1min")
+	if err != nil {
+		applogger.Error("Ignite Huobi Server error: Can not connect mongodb for timestamp: %s", err.Error())
+		return
+	}
+	flowWindowMarketInfo("htusdt", Period_1min, startTimeInt64, endTimeInt64)
+	subscribeMarketInfo("htusdt", Period_1min)
 
 	for accountID, _ := range config.AccountMap {
 		subOrderUpdateV2("btcusdt", accountID)
