@@ -41,7 +41,7 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 	client := s.DB("marketinfo").C(collectionName)
 	mgoSessionMap[collectionName+"-subscribeMarketInfo"] = s
 	if err != nil {
-		applogger.Error("Failed to connection db: %s", err.Error())
+		applogger.Error("Failed to connection #%s db: %s", symbol, err.Error())
 		return
 	}
 
@@ -69,9 +69,9 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 							tickerWrite := t.TickToFloat()
 							err = client.Insert(tickerWrite)
 							if err != nil {
-								applogger.Error("Failed to Insert data : %s", err.Error())
+								applogger.Error("Failed to Insert #%s data : %s", symbol, err.Error())
 							} else {
-								applogger.Info("New Data       Pushed into DB: id: %d", t.Id)
+								applogger.Info("New      #%s Data  Pushed into DB: id: %d", symbol, t.Id)
 							}
 
 							if previousTick != nil {
@@ -80,9 +80,10 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 								previousTickFloat := previousTick.TickToFloat()
 								err := client.Update(selector, previousTickFloat)
 								if err != nil {
-									applogger.Error("Failed to Update Previous Data to db: %s", err.Error())
+									applogger.Error("Failed to Update Previous #%s Data to db: %s", symbol, err.Error())
 								} else {
-									applogger.Info("Previous Data Updated into DB: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+									applogger.Info("Previous #%s Data Updated into DB: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+										symbol,
 										previousTick.Id, previousTick.Count, previousTick.Vol,
 										previousTick.Open, previousTick.Count, previousTick.Low, previousTick.High)
 								}
@@ -167,8 +168,8 @@ func flowWindowMarketInfo(symbol string, period periodUnit, startTime int64, toT
 					if resp.Data != nil {
 						applogger.Info("WebSocket returned data, count=%d", len(resp.Data))
 						for _, t := range resp.Data {
-							applogger.Info("Candlestick data, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-								t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
+							applogger.Info("Candlestick #%s data: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+								symbol, t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
 
 							tickerRetrive := &market.TickFloat{}
 							err := client.Find(bson.M{"id": t.Id}).One(tickerRetrive)
@@ -177,10 +178,10 @@ func flowWindowMarketInfo(symbol string, period periodUnit, startTime int64, toT
 								// if not exist, insert
 								err = client.Insert(tickerWrite)
 								if err != nil {
-									applogger.Error("FlowWindowMarket: Failed to connection db: %s", err.Error())
+									applogger.Error("FlowWindowMarket: Failed to connection #%s db: %s", symbol, err.Error())
 								} else {
-									applogger.Info("FlowWindowMarket: Candlestick data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-										t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
+									applogger.Info("FlowWindowMarket: Candlestick #%s data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+										symbol, t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
 								}
 							} else {
 								// if exist, update it for sync.
@@ -188,10 +189,10 @@ func flowWindowMarketInfo(symbol string, period periodUnit, startTime int64, toT
 								selector := bson.M{"id": tickerWrite.Id}
 								err := client.Update(selector, tickerWrite)
 								if err != nil {
-									applogger.Error("FlowWindowMarket: Failed to update to db: %s", err.Error())
+									applogger.Error("FlowWindowMarket: Failed to update #%s to db: %s", symbol, err.Error())
 								} else {
-									applogger.Info("FlowWindowMarket: Found Previous Data, Update to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-										t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
+									applogger.Info("FlowWindowMarket: Found Previous #%s Data, Update to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+										symbol, t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
 								}
 							}
 						}
