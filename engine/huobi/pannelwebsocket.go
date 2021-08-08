@@ -2,6 +2,7 @@ package huobi
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/GeekChomolungma/Chomolungma/config"
 	"github.com/GeekChomolungma/Chomolungma/db"
@@ -14,7 +15,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-var PreviousSyncTimeMap = make(map[string]int64)
+var PreviousSyncTimeMap sync.Map
 
 type periodUnit string
 
@@ -93,7 +94,7 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 						previousTick = t
 
 						// add PreviousSyncTime into map
-						PreviousSyncTimeMap[collectionName] = t.Id
+						PreviousSyncTimeMap.Store(collectionName, t.Id)
 					}
 
 					if resp.Data != nil {

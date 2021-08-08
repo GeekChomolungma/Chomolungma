@@ -50,6 +50,14 @@ func (HBCylinder *HuoBiCylinder) Ignite() {
 	flowWindowMarketInfo("btcusdt", Period_1min, startTimeInt64, endTimeInt64)
 	subscribeMarketInfo("btcusdt", Period_1min)
 
+	startTimeInt64, err = GetSyncStartTimestamp("HB-ethusdt-1min")
+	if err != nil {
+		applogger.Error("Ignite Huobi Server error: Can not connect mongodb for timestamp: %s", err.Error())
+		return
+	}
+	flowWindowMarketInfo("ethusdt", Period_1min, startTimeInt64, endTimeInt64)
+	subscribeMarketInfo("ethusdt", Period_1min)
+
 	for accountID, _ := range config.AccountMap {
 		subOrderUpdateV2("btcusdt", accountID)
 	}
@@ -93,11 +101,12 @@ func CandlestickClientFlameout() {
 	}
 
 	client := s.DB("marketinfo").C("HB-sync-timestamp")
-	for collection, timestamp := range PreviousSyncTimeMap {
+
+	timeIteration := func(collection, timestamp interface{}) bool {
 		prevSyncTime := &dtos.PreviousSyncTime{}
 		err := client.Find(bson.M{"collectionname": collection}).One(prevSyncTime)
-		prevSyncTime.CollectionName = collection
-		prevSyncTime.PreviousSyncTs = timestamp
+		prevSyncTime.CollectionName = collection.(string)
+		prevSyncTime.PreviousSyncTs = timestamp.(int64)
 		if err != nil {
 			// not exist, insert flag
 			err = client.Insert(prevSyncTime)
@@ -116,7 +125,9 @@ func CandlestickClientFlameout() {
 				applogger.Info("HuoBi Flameout, Updated %s sync time: %d", collection, timestamp)
 			}
 		}
+		return true
 	}
+	PreviousSyncTimeMap.Range(timeIteration)
 	s.Close()
 
 	for collectionName, client := range wsCandlestickClientMap {
