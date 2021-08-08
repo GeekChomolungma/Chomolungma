@@ -3,8 +3,9 @@ package dtos
 // httpModel is a wrapper for http client,
 // which controls the Chomolungma.
 type HttpReqModel struct {
-	AimSite string `json:"aimsite"`
-	Body    string `json:"body"`
+	AimSite   string `json:"aimsite"`
+	AccountID string `json:"accountid"`
+	Body      string `json:"body"`
 }
 
 type HttpRspModel struct {

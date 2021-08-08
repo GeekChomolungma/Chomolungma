@@ -1,6 +1,7 @@
 package huobi
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -17,32 +18,46 @@ import (
 
 // -------------------------------------------------------------ACCOUNT-------------------------------------------------------
 // GetAccountInfo return the account info
-func GetAccountInfo() {
+func GetAccountInfo(accountID string) {
+	// seek accessKey with accountID
+	accessKey, err := SeekAccountAccessKey(accountID)
+	if err != nil {
+		applogger.Error("GetAccountInfo: AccountMap could not found key matches the accountID %s", accountID)
+		return
+	}
+
 	httpClient := new(clients.AccountClient).Init(
 		config.GatewaySetting.GatewayHost,
-		config.HuoBiApiSetting.AccessKey,
+		accessKey,
 		config.HuoBiApiSetting.SecretKey,
 		config.HuoBiApiSetting.ApiServerHost,
 	)
 	resp, err := httpClient.GetAccountInfo()
 	if err != nil {
-		applogger.Error("Get account error: %s", err.Error())
+		applogger.Error("GetAccountInfo: get account error: %s", err.Error())
 	} else {
-		applogger.Info("Get account, count=%d", len(resp))
+		applogger.Info("GetAccountInfo: get account, count=%d", len(resp))
 		for _, result := range resp {
 			applogger.Info("account: %+v", result)
 		}
 	}
 }
 
-func GetAccountBalance() (*account.AccountBalance, error) {
+func GetAccountBalance(accountID string) (*account.AccountBalance, error) {
+	// seek accessKey with accountID
+	accessKey, err := SeekAccountAccessKey(accountID)
+	if err != nil {
+		applogger.Error("GetAccountBalance: AccountMap could not found key matches the accountID %s", accountID)
+		return nil, errors.New("accountID not match")
+	}
+
 	httpClient := new(clients.AccountClient).Init(
 		config.GatewaySetting.GatewayHost,
-		config.HuoBiApiSetting.AccessKey,
+		accessKey,
 		config.HuoBiApiSetting.SecretKey,
 		config.HuoBiApiSetting.ApiServerHost,
 	)
-	resp, err := httpClient.GetAccountBalance("3667382")
+	resp, err := httpClient.GetAccountBalance(accountID)
 	if err != nil {
 		applogger.Error("Cannot get account balance: %s", err.Error())
 		return nil, err
@@ -53,18 +68,25 @@ func GetAccountBalance() (*account.AccountBalance, error) {
 }
 
 // -------------------------------------------------------------ORDER-------------------------------------------------------
-func PlaceOrder(symbol, model, amount, price, source string) {
+func PlaceOrder(symbol, model, amount, price, source string, accountID string) {
+	// seek accessKey with accountID
+	accessKey, err := SeekAccountAccessKey(accountID)
+	if err != nil {
+		applogger.Error("PlaceOrder: AccountMap could not found key matches the accountID %s", accountID)
+		return
+	}
+
 	client := new(clients.OrderClient).Init(
 		config.GatewaySetting.GatewayHost,
-		config.HuoBiApiSetting.AccessKey,
+		accessKey,
 		config.HuoBiApiSetting.SecretKey,
 		config.HuoBiApiSetting.ApiServerHost,
 	)
 	request := order.PlaceOrderRequest{
-		AccountId: "3667382",
-		Symbol:    symbol, // "btcusdt"
-		Type:      model,  // "buy-limit"
-		Source:    source, // "spot-api"
+		AccountId: accountID, //"3667382",
+		Symbol:    symbol,    // "btcusdt"
+		Type:      model,     // "buy-limit"
+		Source:    source,    // "spot-api"
 	}
 
 	applogger.Info("PlaceOrder: Order model is %s", model)
@@ -72,8 +94,8 @@ func PlaceOrder(symbol, model, amount, price, source string) {
 	collectionName := fmt.Sprintf("%s-%s", "HB", "symbols")
 	DBclient := s.DB("marketinfo").C(collectionName)
 	sameSym := &common.SymbolFloat{}
-	err := DBclient.Find(bson.M{"symbol": symbol}).One(sameSym)
-	if err != nil {
+	dberr := DBclient.Find(bson.M{"symbol": symbol}).One(sameSym)
+	if dberr != nil {
 		applogger.Error("PlaceOrder: Error, there is no symbol: %s could be traded! Please check HuoBi's available symbols", symbol)
 		return
 	}
@@ -237,10 +259,17 @@ func checkProduction(amount, price string, minV, maxV float64) bool {
 	return true
 }
 
-func CancelOrderById(orderID string) {
+func CancelOrderById(accountID, orderID string) {
+	// seek accessKey with accountID
+	accessKey, err := SeekAccountAccessKey(accountID)
+	if err != nil {
+		applogger.Error("CancelOrderById: AccountMap could not found key matches the accountID %s", accountID)
+		return
+	}
+
 	client := new(clients.OrderClient).Init(
 		config.GatewaySetting.GatewayHost,
-		config.HuoBiApiSetting.AccessKey,
+		accessKey,
 		config.HuoBiApiSetting.SecretKey,
 		config.HuoBiApiSetting.ApiServerHost,
 	)
@@ -257,10 +286,17 @@ func CancelOrderById(orderID string) {
 	}
 }
 
-func GetOrderById(orderID string) {
+func GetOrderById(accountID, orderID string) {
+	// seek accessKey with accountID
+	accessKey, err := SeekAccountAccessKey(accountID)
+	if err != nil {
+		applogger.Error("GetOrderById: AccountMap could not found key matches the accountID %s", accountID)
+		return
+	}
+
 	client := new(clients.OrderClient).Init(
 		config.GatewaySetting.GatewayHost,
-		config.HuoBiApiSetting.AccessKey,
+		accessKey,
 		config.HuoBiApiSetting.SecretKey,
 		config.HuoBiApiSetting.ApiServerHost,
 	)
@@ -348,4 +384,14 @@ func GetTimestamp() (int, error) {
 
 	applogger.Info("Ignite: Initially GetTimestamp in second: %d", timestamp)
 	return timestamp, nil
+}
+
+func SeekAccountAccessKey(accountID string) (string, error) {
+	var accessKey string
+	if ak, exist := config.AccountMap[accountID]; !exist {
+		return "", errors.New("AccountKey Not Found.")
+	} else {
+		accessKey = ak
+	}
+	return accessKey, nil
 }

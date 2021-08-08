@@ -25,7 +25,7 @@ func placeOrder(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"code": dtos.CANNOT_PARSE_POST_BODY, "msg": "Sorry", "data": err.Error()})
 			return
 		}
-		huobi.PlaceOrder(orderInfo.Symbol, orderInfo.Model, orderInfo.Amount, orderInfo.Price, orderInfo.Source)
+		huobi.PlaceOrder(orderInfo.Symbol, orderInfo.Model, orderInfo.Amount, orderInfo.Price, orderInfo.Source, Req.AccountID)
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"code": dtos.AIM_SITE_NOT_EXIST, "msg": "Sorry", "data": err.Error()})
 	}
@@ -47,7 +47,7 @@ func cancelOrderById(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"code": dtos.CANNOT_PARSE_POST_BODY, "msg": "Sorry", "data": err.Error()})
 			return
 		}
-		huobi.CancelOrderById(orderCancel.OrderID)
+		huobi.CancelOrderById(Req.AccountID, orderCancel.OrderID)
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"code": dtos.AIM_SITE_NOT_EXIST, "msg": "Sorry", "data": err.Error()})
 	}
@@ -69,7 +69,7 @@ func getOrderById(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"code": dtos.CANNOT_PARSE_POST_BODY, "msg": "Sorry", "data": err.Error()})
 			return
 		}
-		huobi.GetOrderById(orderQuery.OrderID)
+		huobi.GetOrderById(Req.AccountID, orderQuery.OrderID)
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"code": dtos.AIM_SITE_NOT_EXIST, "msg": "Sorry", "data": err.Error()})
 	}

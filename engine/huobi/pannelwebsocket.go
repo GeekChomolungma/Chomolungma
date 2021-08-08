@@ -264,10 +264,17 @@ func subOrderUpdateV2(symbol, accountID string) {
 		return
 	}
 
+	// seek accessKey with accountID
+	accessKey, err := SeekAccountAccessKey(accountID)
+	if err != nil {
+		applogger.Error("subOrderUpdateV2: AccountMap could not found key matches the accountID %s", accountID)
+		return
+	}
+
 	// Initialize a new instance
 	wsClient := new(orderwebsocketclient.SubscribeOrderWebSocketV2Client).Init(
 		config.GatewaySetting.GatewayHost,
-		config.HuoBiApiSetting.AccessKey,
+		accessKey,
 		config.HuoBiApiSetting.SecretKey,
 		config.HuoBiApiSetting.ApiServerHost,
 	)
@@ -328,5 +335,5 @@ func subOrderUpdateV2(symbol, accountID string) {
 	// Connect to the server and wait for the handler to handle the response
 	wsClient.Connect(true)
 	// HB-AccountID-Symbol
-	wsOrderV2ClientMap["HB-3667382-btcusdt"] = wsClient
+	wsOrderV2ClientMap[collectionName] = wsClient
 }

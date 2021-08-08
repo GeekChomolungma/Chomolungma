@@ -19,7 +19,7 @@ func getAccountInfo(c *gin.Context) {
 
 	switch Req.AimSite {
 	case "HuoBi":
-		huobi.GetAccountInfo()
+		huobi.GetAccountInfo(Req.AccountID)
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"code": dtos.AIM_SITE_NOT_EXIST, "msg": "Sorry", "data": err.Error()})
 	}
@@ -36,7 +36,7 @@ func getAccountBalance(c *gin.Context) {
 	switch Req.AimSite {
 	case "HuoBi":
 		// get all currency
-		balance, err := huobi.GetAccountBalance()
+		balance, err := huobi.GetAccountBalance(Req.AccountID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"code": dtos.CANNOT_GET_ACCOUNT_BALANCE, "msg": "Sorry", "data": err.Error()})
 			return

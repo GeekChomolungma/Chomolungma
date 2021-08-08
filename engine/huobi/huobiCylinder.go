@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GeekChomolungma/Chomolungma/config"
 	"github.com/GeekChomolungma/Chomolungma/db"
 	"github.com/GeekChomolungma/Chomolungma/dtos"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/clients/marketwebsocketclient"
@@ -46,10 +47,12 @@ func (HBCylinder *HuoBiCylinder) Ignite() {
 		return
 	}
 	endTimeInt64 := int64(endTime + 60)
-
 	flowWindowMarketInfo("btcusdt", Period_1min, startTimeInt64, endTimeInt64)
 	subscribeMarketInfo("btcusdt", Period_1min)
-	subOrderUpdateV2("btcusdt", "3667382")
+
+	for accountID, _ := range config.AccountMap {
+		subOrderUpdateV2("btcusdt", accountID)
+	}
 }
 
 func GetSyncStartTimestamp(collection string) (int64, error) {
