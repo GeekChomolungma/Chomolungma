@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/GeekChomolungma/Chomolungma/config"
 	"github.com/GeekChomolungma/Chomolungma/engine"
 	"github.com/GeekChomolungma/Chomolungma/handler"
+	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
 )
 
 func main() {
@@ -28,10 +30,11 @@ func main() {
 	go handler.LocalServer()
 
 	c := make(chan os.Signal, 5)
-	signal.Notify(c)
+	signal.Notify(c, os.Interrupt, os.Kill, syscall.SIGABRT, syscall.SIGTERM)
 	for {
 		select {
-		case <-c:
+		case sig := <-c:
+			applogger.Info("Capture a System Call: %s", sig.String())
 			engine.EngineBus.Stop()
 			return
 		default:
