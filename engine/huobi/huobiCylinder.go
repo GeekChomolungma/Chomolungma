@@ -90,6 +90,22 @@ func GetSyncStartTimestamp(collection string) (int64, error) {
 	return startTimeInt64, nil
 }
 
+func (HBCylinder *HuoBiCylinder) Flush() {
+	go flushPerSecond(120)
+}
+
+func flushPerSecond(sec int) {
+	// every sec flush sync timestamp
+	ticker := time.NewTicker(time.Duration(sec) * time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			applogger.Info("Flush: HuoBi MarketInfo flush ticker time up, call flushSyncTime.")
+			flushSyncTime()
+		}
+	}
+}
+
 // Flameout elegantly stop the Cylinder
 func (HBCylinder *HuoBiCylinder) Flameout() {
 	CandlestickClientFlameout() // market info
@@ -102,6 +118,17 @@ func (HBCylinder *HuoBiCylinder) Flameout() {
 }
 
 func CandlestickClientFlameout() {
+	flushSyncTime()
+
+	for collectionName, client := range wsCandlestickClientMap {
+		sp := strings.Split(collectionName, "-")
+		client.UnSubscribe(sp[1], sp[2], "2118")
+		client.Close()
+		applogger.Info("MarketInfo Client: %s closed", collectionName)
+	}
+}
+
+func flushSyncTime() {
 	// update previousTickMap into mongo
 	s, err := db.CreateMarketDBSession()
 	if err != nil {
@@ -109,7 +136,6 @@ func CandlestickClientFlameout() {
 	}
 
 	client := s.DB("marketinfo").C("HB-sync-timestamp")
-
 	timeIteration := func(collection, timestamp interface{}) bool {
 		prevSyncTime := &dtos.PreviousSyncTime{}
 		err := client.Find(bson.M{"collectionname": collection}).One(prevSyncTime)
@@ -119,31 +145,24 @@ func CandlestickClientFlameout() {
 			// not exist, insert flag
 			err = client.Insert(prevSyncTime)
 			if err != nil {
-				applogger.Error("HuoBi Flameout, Insert %s sync time Error: %s", collection, err.Error())
+				applogger.Error("HuoBi flushSyncTime, Insert %s sync time Error: %s", collection, err.Error())
 			} else {
-				applogger.Info("HuoBi Flameout, Inserted %s sync time: %d", collection, timestamp)
+				applogger.Info("HuoBi flushSyncTime, Inserted %s sync time: %d", collection, timestamp)
 			}
 		} else {
 			//update
 			selector := bson.M{"collectionname": collection}
 			err := client.Update(selector, prevSyncTime)
 			if err != nil {
-				applogger.Error("HuoBi Flameout, Update %s sync time Error: %s", collection, err.Error())
+				applogger.Error("HuoBi flushSyncTime, Update %s sync time Error: %s", collection, err.Error())
 			} else {
-				applogger.Info("HuoBi Flameout, Updated %s sync time: %d", collection, timestamp)
+				applogger.Info("HuoBi flushSyncTime, Updated %s sync time: %d", collection, timestamp)
 			}
 		}
 		return true
 	}
 	PreviousSyncTimeMap.Range(timeIteration)
 	s.Close()
-
-	for collectionName, client := range wsCandlestickClientMap {
-		sp := strings.Split(collectionName, "-")
-		client.UnSubscribe(sp[1], sp[2], "2118")
-		client.Close()
-		applogger.Info("MarketInfo Client: %s closed", collectionName)
-	}
 }
 
 func OrderV2ClientFlameout() {
