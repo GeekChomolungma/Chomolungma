@@ -114,8 +114,16 @@ func subscribeMarketInfo(label string) {
 							}
 							applogger.Info("New      #%s Data  Pushed into DB: id: %d", symbol, t.Id)
 						}
+
 						// update previous tick
-						previousTick = t
+						if previousTick != nil && t.Id == previousTick.Id && t.Count < previousTick.Count {
+							// the same id tick but wrong sequence, ignore it.
+							applogger.Error("Same #%s Data tick received(ts:%d, count:%d) , but previous data count is %d, ignore it.",
+								symbol, t.Id, t.Count, previousTick.Count)
+						} else {
+							previousTick = t
+						}
+
 						rwMutex.Unlock()
 
 						// add PreviousSyncTime into map
