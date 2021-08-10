@@ -42,6 +42,7 @@ const (
 // if the inequality above not satisfy, a time window will be calculated, which
 // splits the duration into multi 300-size slots.
 func subscribeMarketInfo(label string) {
+	rwMutex := new(sync.RWMutex)
 	var previousTick *market.Tick
 	sp := strings.Split(label, "-")
 	symbol := sp[1]
@@ -84,6 +85,9 @@ func subscribeMarketInfo(label string) {
 					if resp.Tick != nil {
 						t := resp.Tick
 						tickerRetrive := &market.TickFloat{}
+
+						// add a mutex for mgodb read and write
+						rwMutex.Lock()
 						err := client.Find(bson.M{"id": t.Id}).One(tickerRetrive)
 						if err != nil {
 							// if not exist, insert
@@ -112,6 +116,7 @@ func subscribeMarketInfo(label string) {
 						}
 						// update previous tick
 						previousTick = t
+						rwMutex.Unlock()
 
 						// add PreviousSyncTime into map
 						PreviousSyncTimeMap.Store(collectionName, t.Id)
