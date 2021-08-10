@@ -1,7 +1,9 @@
 package huobi
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/GeekChomolungma/Chomolungma/config"
@@ -33,25 +35,47 @@ const (
 )
 
 // -------------------------------------------------------------MARKET-------------------------------------------------------
-func subscribeMarketInfo(symbol string, period periodUnit) {
+
+// subscribeMarketInfo records tickers, and the max tickers number is 300 once.
+// So, startTime and toTime should be constrain for:
+//                   (toTime - startTime) / period < 300
+// if the inequality above not satisfy, a time window will be calculated, which
+// splits the duration into multi 300-size slots.
+func subscribeMarketInfo(label string) {
 	var previousTick *market.Tick
+	sp := strings.Split(label, "-")
+	symbol := sp[1]
+	period := periodUnit(sp[2])
 
 	// connect market db
 	s, err := db.CreateMarketDBSession()
-	collectionName := fmt.Sprintf("HB-%s-%s", symbol, string(period))
+	collectionName := label
 	client := s.DB("marketinfo").C(collectionName)
-	mgoSessionMap[collectionName+"-subscribeMarketInfo"] = s
+	mgoSessionMap[collectionName] = s
 	if err != nil {
-		applogger.Error("Failed to connection #%s db: %s", symbol, err.Error())
+		applogger.Error("subscribeMarketInfo: Failed to connection db, %s", err.Error())
 		return
 	}
 
 	// websocket
 	wsClient := new(marketwebsocketclient.CandlestickWebSocketClient).Init(config.GatewaySetting.GatewayHost)
-
 	wsClient.SetHandler(
 		func() {
-			wsClient.Subscribe(symbol, string(period), "2118")
+			applogger.Info("subscribeMarketInfo: HuoBi MarketInfo subscription #%s, K-period %s.", symbol, period)
+			// caculate a sync time window
+			timeWindow, err := makeTimeWindow(label, period)
+			if err != nil {
+				return
+			}
+			applogger.Info("subscribeMarketInfo: timeWindow length is %d, data is %d", len(timeWindow), timeWindow)
+			wsClient.Subscribe(symbol, string(period), "1")
+
+			// multi request for data returned under 300 once.
+			// whatever the period is, request should make sure that
+			// the res return data length less than 300.
+			for _, timeEle := range timeWindow {
+				wsClient.Request(symbol, string(period), timeEle[0], timeEle[1], "2")
+			}
 		},
 		func(response interface{}) {
 			resp, ok := response.(market.SubscribeCandlestickResponse)
@@ -59,9 +83,6 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 				if &resp != nil {
 					if resp.Tick != nil {
 						t := resp.Tick
-						// applogger.Info("Candlestick update, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-						// 	t.Id, t.Count, t.Vol, t.Open, t.Close, t.Low, t.High)
-
 						tickerRetrive := &market.TickFloat{}
 						err := client.Find(bson.M{"id": t.Id}).One(tickerRetrive)
 						if err != nil {
@@ -71,8 +92,6 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 							err = client.Insert(tickerWrite)
 							if err != nil {
 								applogger.Error("Failed to Insert #%s data : %s", symbol, err.Error())
-							} else {
-								applogger.Info("New      #%s Data  Pushed into DB: id: %d", symbol, t.Id)
 							}
 
 							if previousTick != nil {
@@ -89,6 +108,7 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 										previousTick.Open, previousTick.Count, previousTick.Low, previousTick.High)
 								}
 							}
+							applogger.Info("New      #%s Data  Pushed into DB: id: %d", symbol, t.Id)
 						}
 						// update previous tick
 						previousTick = t
@@ -97,81 +117,14 @@ func subscribeMarketInfo(symbol string, period periodUnit) {
 						PreviousSyncTimeMap.Store(collectionName, t.Id)
 					}
 
+					// The history Tick data,
+					// which are requested from startTime to toTime,
+					// are included in resp.Data
 					if resp.Data != nil {
-						applogger.Info("WebSocket returned data, count=%d", len(resp.Data))
+						applogger.Info("Sync MarketInfo: WebSocket returned data, count=%d", len(resp.Data))
 						for _, t := range resp.Data {
-							applogger.Info("Candlestick data, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-								t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
-
-							tickerRetrive := &market.TickFloat{}
-							err := client.Find(bson.M{"id": t.Id}).One(tickerRetrive)
-							if err != nil {
-								// if not exist, insert
-								applogger.Error("not exist, insert")
-								tickerWrite := t.TickToFloat()
-								err = client.Insert(tickerWrite)
-								if err != nil {
-									applogger.Error("Failed to connection db: %s", err.Error())
-								} else {
-									applogger.Info("Candlestick data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-										t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
-								}
-							}
-						}
-					}
-				}
-			} else {
-				applogger.Warn("Unknown response: %v", resp)
-			}
-
-		})
-
-	wsClient.Connect(true)
-	wsCandlestickClientMap[collectionName+"-subscribeMarketInfo"] = wsClient
-}
-
-// flowWindowMarketInfo returns tickers, and the max tickers number is 300 once.
-// So, startTime and toTime should be constrain for:
-//                   (toTime - startTime)/period < 300
-func flowWindowMarketInfo(symbol string, period periodUnit, startTime int64, toTime int64) {
-	// make a time window
-	timeWindow, err := makeTimeWindow(period, startTime, toTime)
-	if err != nil {
-		return
-	}
-	applogger.Info("timeWindow length is: %d, data is: %d",
-		len(timeWindow), timeWindow)
-	// connect market db
-	s, err := db.CreateMarketDBSession()
-	collectionName := fmt.Sprintf("HB-%s-%s", symbol, string(period))
-	client := s.DB("marketinfo").C(collectionName)
-	mgoSessionMap[collectionName+"-flowWindowMarketInfo"] = s
-	if err != nil {
-		applogger.Error("Failed to connection db: %s", err.Error())
-		return
-	}
-
-	// websocket
-	wsClient := new(marketwebsocketclient.CandlestickWebSocketClient).Init(config.GatewaySetting.GatewayHost)
-	wsClient.SetHandler(
-		func() {
-			// multi request for data returned under 300 once.
-			// whatever the period is, request should make sure that
-			// the res return data length less than 300.
-			for _, timeEle := range timeWindow {
-				wsClient.Request(symbol, string(period), timeEle[0], timeEle[1], "2305")
-			}
-		},
-		func(response interface{}) {
-			resp, ok := response.(market.SubscribeCandlestickResponse)
-			if ok {
-				if &resp != nil {
-					if resp.Data != nil {
-						applogger.Info("WebSocket returned data, count=%d", len(resp.Data))
-						for _, t := range resp.Data {
-							applogger.Info("Candlestick #%s data: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-								symbol, t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
-
+							// applogger.Info("Sync MarketInfo: Candlestick #%s data: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+							// 	symbol, t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
 							tickerRetrive := &market.TickFloat{}
 							err := client.Find(bson.M{"id": t.Id}).One(tickerRetrive)
 							tickerWrite := t.TickToFloat()
@@ -179,9 +132,9 @@ func flowWindowMarketInfo(symbol string, period periodUnit, startTime int64, toT
 								// if not exist, insert
 								err = client.Insert(tickerWrite)
 								if err != nil {
-									applogger.Error("FlowWindowMarket: Failed to connection #%s db: %s", symbol, err.Error())
+									applogger.Error("Sync MarketInfo: Failed to connection #%s db: %s", symbol, err.Error())
 								} else {
-									applogger.Info("FlowWindowMarket: Candlestick #%s data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+									applogger.Info("Sync MarketInfo: Candlestick #%s data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
 										symbol, t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
 								}
 							} else {
@@ -190,9 +143,9 @@ func flowWindowMarketInfo(symbol string, period periodUnit, startTime int64, toT
 								selector := bson.M{"id": tickerWrite.Id}
 								err := client.Update(selector, tickerWrite)
 								if err != nil {
-									applogger.Error("FlowWindowMarket: Failed to update #%s to db: %s", symbol, err.Error())
+									applogger.Error("Sync MarketInfo: Failed to update #%s to db: %s", symbol, err.Error())
 								} else {
-									applogger.Info("FlowWindowMarket: Found Previous #%s Data, Update to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+									applogger.Info("Sync MarketInfo: Found Previous #%s Data, Update to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
 										symbol, t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
 								}
 							}
@@ -200,16 +153,27 @@ func flowWindowMarketInfo(symbol string, period periodUnit, startTime int64, toT
 					}
 				}
 			} else {
-				applogger.Warn("Unknown response: %v", resp)
+				applogger.Warn("subscribeMarketInfo: Unknown response: %v", resp)
 			}
-
 		})
 
 	wsClient.Connect(true)
-	wsCandlestickClientMap[collectionName+"-flowWindowMarketInfo"] = wsClient
+	wsCandlestickClientMap[collectionName] = wsClient
 }
 
-func makeTimeWindow(period periodUnit, startTime int64, toTime int64) ([][]int64, error) {
+func makeTimeWindow(label string, period periodUnit) ([][]int64, error) {
+	startTime, err := GetSyncStartTimestamp(label)
+	if err != nil {
+		applogger.Error("subscribeMarketInfo: makeTimeWindow error, Can not connect mongodb for timestamp: %s", err.Error())
+		return nil, errors.New("")
+	}
+	prevToTime, err := GetTimestamp()
+	if err != nil {
+		applogger.Error("subscribeMarketInfo: makeTimeWindow error, Huobi Server error: Can not get server timestamp: %s", err.Error())
+		return nil, errors.New("")
+	}
+	toTime := int64(prevToTime + 60)
+
 	var divisor int64
 	var timeWindow [][]int64
 	switch period {

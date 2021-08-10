@@ -18,6 +18,7 @@ var mgoSessionMap map[string]*mgo.Session
 var wsCandlestickClientMap map[string]*marketwebsocketclient.CandlestickWebSocketClient
 var wsOrderV2ClientMap map[string]*orderwebsocketclient.SubscribeOrderWebSocketV2Client
 var httpClientMap map[string]interface{}
+var FlushDuration int
 
 type HuoBiCylinder struct {
 }
@@ -35,36 +36,9 @@ func (HBCylinder *HuoBiCylinder) Ignite() {
 
 	// subscribe the marketinfo
 	// query sync time
-	startTimeInt64, err := GetSyncStartTimestamp("HB-ethusdt-1min")
-	if err != nil {
-		applogger.Error("Ignite Huobi Server error: Can not connect mongodb for timestamp: %s", err.Error())
-		return
+	for _, label := range config.HBMarketSubList {
+		subscribeMarketInfo(label)
 	}
-
-	endTime, err := GetTimestamp()
-	if err != nil {
-		applogger.Error("Ignite Huobi Server error: Can not get server timestamp: %s", err.Error())
-		return
-	}
-	endTimeInt64 := int64(endTime + 60)
-	flowWindowMarketInfo("ethusdt", Period_1min, startTimeInt64, endTimeInt64)
-	subscribeMarketInfo("ethusdt", Period_1min)
-
-	startTimeInt64, err = GetSyncStartTimestamp("HB-btcusdt-1min")
-	if err != nil {
-		applogger.Error("Ignite Huobi Server error: Can not connect mongodb for timestamp: %s", err.Error())
-		return
-	}
-	flowWindowMarketInfo("btcusdt", Period_1min, startTimeInt64, endTimeInt64)
-	subscribeMarketInfo("btcusdt", Period_1min)
-
-	startTimeInt64, err = GetSyncStartTimestamp("HB-htusdt-1min")
-	if err != nil {
-		applogger.Error("Ignite Huobi Server error: Can not connect mongodb for timestamp: %s", err.Error())
-		return
-	}
-	flowWindowMarketInfo("htusdt", Period_1min, startTimeInt64, endTimeInt64)
-	subscribeMarketInfo("htusdt", Period_1min)
 
 	for accountID, _ := range config.AccountMap {
 		subOrderUpdateV2("btcusdt", accountID)
@@ -91,7 +65,8 @@ func GetSyncStartTimestamp(collection string) (int64, error) {
 }
 
 func (HBCylinder *HuoBiCylinder) Flush() {
-	go flushPerSecond(120)
+	FlushDuration = 300
+	go flushPerSecond(FlushDuration)
 }
 
 func flushPerSecond(sec int) {

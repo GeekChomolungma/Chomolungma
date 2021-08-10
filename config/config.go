@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
@@ -39,6 +40,13 @@ type GatewayConf struct {
 
 var GatewaySetting = &GatewayConf{}
 
+type MarketSubConf struct {
+	Symbols []string
+	Periods []string
+}
+
+var MarketSubSetting = &MarketSubConf{}
+var HBMarketSubList []string
 var AccountMap = make(map[string]string)
 
 // Setup 启动配置
@@ -53,6 +61,8 @@ func Setup() {
 	mapTo(cfg, "server", ServerSetting)
 	mapTo(cfg, "gateway", GatewaySetting)
 	mapTo(cfg, "huobi", HuoBiApiSetting)
+	mapTo(cfg, "marketsub", MarketSubSetting)
+
 	if len(HuoBiApiSetting.AccessKey) != len(HuoBiApiSetting.AccountId) {
 		applogger.Error("AccessKey not match AccountId, please check config.")
 		panic("")
@@ -67,6 +77,14 @@ func Setup() {
 			panic("")
 		}
 	}
+
+	for _, syb := range MarketSubSetting.Symbols {
+		for _, period := range MarketSubSetting.Periods {
+			label := fmt.Sprintf("HB-%s-%s", syb, period)
+			HBMarketSubList = append(HBMarketSubList, label)
+		}
+	}
+	applogger.Info("HB marketinfo sub list length is %d", len(HBMarketSubList))
 	applogger.Info("AccountMap Loaded, there are %d accountkeys in.", len(HuoBiApiSetting.AccessKey))
 	applogger.Info("Config Setup Success.")
 }
