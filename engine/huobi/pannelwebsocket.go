@@ -125,7 +125,7 @@ func subscribeMarketInfo(label string) {
 									}
 									applogger.Info("New      #%s Tick Insert into DB: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
 										symbol, previousTick.Id, previousTick.Count, previousTick.Vol,
-										previousTick.Open, previousTick.Count, previousTick.Low, previousTick.High)
+										previousTick.Open, previousTick.High, previousTick.Low, previousTick.Close)
 								} else {
 									// Old time item received, which time is less than timeList bottom item's,
 									// it suffered an long network delay(like 10*period), disregard it.
@@ -145,7 +145,7 @@ func subscribeMarketInfo(label string) {
 										} else {
 											applogger.Info("Previous #%s Tick Updated into DB: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
 												symbol, previousTick.Id, previousTick.Count, previousTick.Vol,
-												previousTick.Open, previousTick.Count, previousTick.Low, previousTick.High)
+												previousTick.Open, previousTick.High, previousTick.Low, previousTick.Close)
 										}
 									}
 								}
@@ -196,7 +196,7 @@ func subscribeMarketInfo(label string) {
 											applogger.Info("Previous #%s Tick Updated into DB: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
 												symbol,
 												t.Id, t.Count, t.Vol,
-												t.Open, t.Count, t.Low, t.High)
+												t.Open, t.High, t.Low, t.Close)
 										}
 									}
 								}
@@ -222,7 +222,7 @@ func subscribeMarketInfo(label string) {
 									applogger.Error("Sync MarketInfo: Failed to connection #%s db: %s", symbol, err.Error())
 								} else {
 									applogger.Info("Sync MarketInfo: Candlestick #%s data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-										symbol, t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
+										symbol, t.Id, t.Count, t.Vol, t.Open, t.High, t.Low, t.Close)
 								}
 							} else {
 								// if exist, update it for sync.
@@ -234,7 +234,7 @@ func subscribeMarketInfo(label string) {
 										applogger.Error("Sync MarketInfo: Failed to update #%s to db: %s", symbol, err.Error())
 									} else {
 										applogger.Info("Sync MarketInfo: Found Previous #%s Data, Update to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-											symbol, t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
+											symbol, t.Id, t.Count, t.Vol, t.Open, t.High, t.Low, t.Close)
 									}
 								}
 							}
