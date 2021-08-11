@@ -378,11 +378,11 @@ func GetTimestamp() (int, error) {
 	timeMillsecs, err := httpClient.GetTimestamp()
 	timestamp := timeMillsecs / 1000
 	if err != nil {
-		applogger.Error("Ignite: Initially Get GetTimestamp error: %s", err.Error())
+		applogger.Error("GetTimestamp: Initially get timestamp error: %s", err.Error())
 		return 0, err
 	}
 
-	applogger.Info("Ignite: Initially GetTimestamp in second: %d", timestamp)
+	applogger.Info("GetTimestamp: Initially get timestamp in second: %d", timestamp)
 	return timestamp, nil
 }
 

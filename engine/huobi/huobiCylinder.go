@@ -79,7 +79,7 @@ func flushPerSecond(sec int) {
 	for {
 		select {
 		case <-ticker.C:
-			applogger.Info("Flush: HuoBi MarketInfo flush ticker time up, call flushSyncTime.")
+			applogger.Debug("Flush: HuoBi MarketInfo flush ticker time up, call flushSyncTime.")
 			flushSyncTime()
 		}
 	}

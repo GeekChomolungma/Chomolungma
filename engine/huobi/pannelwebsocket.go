@@ -44,8 +44,14 @@ const (
 // splits the duration into multi 300-size slots.
 func subscribeMarketInfo(label string) {
 	collectionName := label
-	var timeList []int64                         // TickMap auxiliary
-	TickMap := make(map[int64]*market.TickFloat) // TickMap is a 10-size flow window
+	var dataUnsynced int // data wait to sync number
+	duStayCount := 0     // if dataUnsynced keep one value for 5 times, we consider it as syned successfully
+	duStay := 0
+	var timeList []int64 // TickMap auxiliary
+
+	// TickMap is a const size(like 5) flow window, to cache new tick received from remote,
+	// it can reduce pressure of DB read and write.
+	TickMap := make(map[int64]*market.TickFloat)
 	rwMutex := new(sync.RWMutex)
 
 	sp := strings.Split(label, "-") // label: HB-btcusdt-1min
@@ -73,11 +79,12 @@ func subscribeMarketInfo(label string) {
 		func() {
 			applogger.Info("subscribeMarketInfo: HuoBi MarketInfo subscription #%s, K-period %s.", symbol, period)
 			// caculate a sync time window
-			timeWindow, err := makeTimeWindow(label, period)
+			timeWindow, datalength, err := makeTimeWindow(label, period)
 			if err != nil {
 				return
 			}
-			applogger.Info("subscribeMarketInfo: timeWindow length is %d, data is %d", len(timeWindow), timeWindow)
+			dataUnsynced = datalength
+			applogger.Info("subscribeMarketInfo: timeWindow length is %d, datalength is %d, data is %d", len(timeWindow), datalength, timeWindow)
 			wsClient.Subscribe(symbol, string(period), "1")
 
 			// multi request for data returned under 300 once.
@@ -114,17 +121,18 @@ func subscribeMarketInfo(label string) {
 								// get previous tick
 								previousTime := timeList[len(timeList)-2]
 								previousTick := TickMap[previousTime]
-								count, _ := client.Find(bson.M{"id": previousTick.Id}).Count()
-								if count == 0 {
+								tickCmp := &market.TickFloat{}
+								err := client.Find(bson.M{"id": previousTick.Id}).One(tickCmp)
+								if err != nil {
 									// add previous tick into db
 									previousTickWrite := previousTick
 									err = client.Insert(previousTickWrite)
 									if err != nil {
-										applogger.Error("Failed to Insert #%s Tick: id: %d, count: %d, errmsg: %s",
-											symbol, previousTick.Id, previousTick.Count, err.Error())
+										applogger.Error("Failed to Insert #%s-%s Tick: id: %d, count: %d, errmsg: %s",
+											symbol, period, previousTick.Id, previousTick.Count, err.Error())
 									}
-									applogger.Info("New      #%s Tick Insert into DB: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-										symbol, previousTick.Id, previousTick.Count, previousTick.Vol,
+									applogger.Info("New      #%s-%s Tick Insert into DB: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+										symbol, period, previousTick.Id, previousTick.Count, previousTick.Vol,
 										previousTick.Open, previousTick.High, previousTick.Low, previousTick.Close)
 								} else {
 									// Old time item received, which time is less than timeList bottom item's,
@@ -132,39 +140,54 @@ func subscribeMarketInfo(label string) {
 									// OR
 									// Newest time Conflict with resp.Data received.
 									// here may happen a competition with resp.Data, double inert!!!
-									tickCmp := &market.TickFloat{}
-									client.Find(bson.M{"id": previousTick.Id}).One(tickCmp) // must exist in db
-									applogger.Error("Conflict #%s Tick(ts:%d, count:%d) in map has been inerted(ts:%d, count:%d) in DB,triggered by New Tick(ts:%d, count:%d).",
-										symbol, previousTick.Id, previousTick.Count, tickCmp.Id, tickCmp.Count, tf.Id, tf.Count)
+									// OR
+									// restart and reload TickMap
+									applogger.Error("Conflict #%s-%s Tick(ts:%d, count:%d) in map has been inserted(ts:%d, count:%d) in DB,triggered by New Tick(ts:%d, count:%d).",
+										symbol, period, previousTick.Id, previousTick.Count, tickCmp.Id, tickCmp.Count, tf.Id, tf.Count)
 									if tickCmp.Count < previousTick.Count {
 										selector := bson.M{"id": previousTick.Id}
 										err := client.Update(selector, previousTick)
 										if err != nil {
-											applogger.Error("Failed to Update #%s Tick: id: %d, count: %d, errmsg: %s",
-												symbol, previousTick.Id, previousTick.Count, err.Error())
+											applogger.Error("Failed to Update #%s-%s Tick: id: %d, count: %d, errmsg: %s",
+												symbol, period, previousTick.Id, previousTick.Count, err.Error())
 										} else {
-											applogger.Info("Previous #%s Tick Updated into DB: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-												symbol, previousTick.Id, previousTick.Count, previousTick.Vol,
+											applogger.Info("Previous #%s-%s Tick Updated into DB: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+												symbol, period, previousTick.Id, previousTick.Count, previousTick.Vol,
 												previousTick.Open, previousTick.High, previousTick.Low, previousTick.Close)
 										}
 									}
 								}
 							}
 
-							// remove the oldest item, which is 5th at the bottom
+							// remove the oldest item, which is 6th at the bottom
 							if len(timeList) > 5 {
 								// add PreviousSyncTime into map
-								bottomTime := timeList[0]
-								if SyncID, ok := PreviousSyncTimeMap.Load(collectionName); !ok {
-									applogger.Error("Load PreviousSyncTimeMap failed: value for key: %s not exist.", collectionName)
-									PreviousSyncTimeMap.Store(collectionName, TickMap[timeList[0]].Id)
-								} else {
-									SyncIDInt64 := SyncID.(int64)
-									if bottomTime > SyncIDInt64 {
+								// TODO: should confirm all resp.Data are synced, else the unsynced part will lose.
+								//       here 3 will be considered for different period.
+								printSyncStay := true
+								if dataUnsynced <= 3 || duStayCount > 3 {
+									printSyncStay = false
+									bottomTime := timeList[0]
+									if SyncID, ok := PreviousSyncTimeMap.Load(collectionName); !ok {
 										PreviousSyncTimeMap.Store(collectionName, bottomTime)
+										applogger.Error("Load PreviousSyncTimeMap failed: value for key: %s not exist. store bottom %d in", collectionName, bottomTime)
+									} else {
+										SyncIDInt64 := SyncID.(int64)
+										if bottomTime > SyncIDInt64 {
+											PreviousSyncTimeMap.Store(collectionName, bottomTime)
+											applogger.Debug("Store PreviousSyncTimeMap: key-%s, value-%d.", collectionName, bottomTime)
+										}
 									}
 								}
-								// only keep the 10 pass time items
+
+								if duStay == dataUnsynced && printSyncStay {
+									duStayCount++
+									applogger.Info("subscribeMarketInfo: #%s-%s data unsynced stay %d for %d time", symbol, period, dataUnsynced, duStayCount)
+								} else {
+									duStay = dataUnsynced
+								}
+
+								// only keep the 5 pass time items
 								delete(TickMap, timeList[0])
 								timeList = timeList[1:]
 							}
@@ -173,8 +196,8 @@ func subscribeMarketInfo(label string) {
 							// And this tick exists in map, update TickMap
 							if t.Count <= tick.Count {
 								// disregard the old tick in this time
-								applogger.Error("Same time #%s Tick received (ts:%d, count:%d) , but Tick in Map is (ts:%d, count:%d), ignore it.",
-									symbol, t.Id, t.Count, tick.Id, tick.Count)
+								applogger.Error("Same time #%s-%s Tick received (ts:%d, count:%d) , but Tick in Map is (ts:%d, count:%d), ignore it.",
+									symbol, period, t.Id, t.Count, tick.Id, tick.Count)
 							} else {
 								// better tick, update TickMap
 								tf := t.TickToFloat()
@@ -190,11 +213,11 @@ func subscribeMarketInfo(label string) {
 										selector := bson.M{"id": tf.Id}
 										err := client.Update(selector, tf)
 										if err != nil {
-											applogger.Error("Failed to Update #%s Tick: id: %d, count: %d, errmsg: %s",
-												symbol, tf.Id, tf.Count, err.Error())
+											applogger.Error("Failed to Update #%s-%s Tick: id: %d, count: %d, errmsg: %s",
+												symbol, period, tf.Id, tf.Count, err.Error())
 										} else {
-											applogger.Info("Previous #%s Tick Updated into DB: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-												symbol,
+											applogger.Info("Previous #%s-%s Tick Updated into DB: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+												symbol, period,
 												t.Id, t.Count, t.Vol,
 												t.Open, t.High, t.Low, t.Close)
 										}
@@ -210,35 +233,35 @@ func subscribeMarketInfo(label string) {
 					if resp.Data != nil {
 						applogger.Info("Sync MarketInfo: WebSocket returned data, count=%d", len(resp.Data))
 						for _, t := range resp.Data {
-							// applogger.Info("Sync MarketInfo: Candlestick #%s data: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-							// 	symbol, t.Id, t.Count, t.Vol, t.Open, t.Count, t.Low, t.High)
-							tickerRetrive := &market.TickFloat{}
-							err := client.Find(bson.M{"id": t.Id}).One(tickerRetrive)
-							tickerWrite := t.TickToFloat()
+							tf := t.TickToFloat()
+							tickCmp := &market.TickFloat{}
+							err := client.Find(bson.M{"id": tf.Id}).One(tickCmp)
 							if err != nil {
 								// if not exist, insert
-								err = client.Insert(tickerWrite)
+								err = client.Insert(tf)
 								if err != nil {
-									applogger.Error("Sync MarketInfo: Failed to connection #%s db: %s", symbol, err.Error())
+									applogger.Error("Sync MarketInfo: Failed to connection #%s-%s db: %s", symbol, period, err.Error())
 								} else {
-									applogger.Info("Sync MarketInfo: Candlestick #%s data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-										symbol, t.Id, t.Count, t.Vol, t.Open, t.High, t.Low, t.Close)
+									applogger.Info("Sync MarketInfo: Candlestick #%s-%s data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+										symbol, period, t.Id, t.Count, t.Vol, t.Open, t.High, t.Low, t.Close)
 								}
 							} else {
 								// if exist, update it for sync.
 								// startTime should be equal to previousTick.Id
-								if tickerRetrive.Count < tickerWrite.Count {
-									selector := bson.M{"id": tickerWrite.Id}
-									err := client.Update(selector, tickerWrite)
+								if tickCmp.Count < tf.Count {
+									selector := bson.M{"id": tf.Id}
+									err := client.Update(selector, tf)
 									if err != nil {
-										applogger.Error("Sync MarketInfo: Failed to update #%s to db: %s", symbol, err.Error())
+										applogger.Error("Sync MarketInfo: Failed to update #%s-%s to db: %s", symbol, period, err.Error())
 									} else {
-										applogger.Info("Sync MarketInfo: Found Previous #%s Data, Update to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-											symbol, t.Id, t.Count, t.Vol, t.Open, t.High, t.Low, t.Close)
+										applogger.Info("Sync MarketInfo: Found Previous #%s-%s Data, Update to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+											symbol, period, t.Id, t.Count, t.Vol, t.Open, t.High, t.Low, t.Close)
 									}
 								}
 							}
 						}
+						dataUnsynced = dataUnsynced - len(resp.Data)
+						applogger.Info("Sync MarketInfo: #%s-%s data wait to sync count = %d", symbol, period, dataUnsynced)
 					}
 					rwMutex.Unlock()
 				}
@@ -251,19 +274,17 @@ func subscribeMarketInfo(label string) {
 	wsCandlestickClientMap[collectionName] = wsClient
 }
 
-func makeTimeWindow(label string, period periodUnit) ([][]int64, error) {
+func makeTimeWindow(label string, period periodUnit) ([][]int64, int, error) {
 	startTime, err := GetSyncStartTimestamp(label)
 	if err != nil {
 		applogger.Error("subscribeMarketInfo: makeTimeWindow error, Can not connect mongodb for timestamp: %s", err.Error())
-		return nil, errors.New("")
+		return nil, 0, errors.New("")
 	}
 	prevToTime, err := GetTimestamp()
 	if err != nil {
 		applogger.Error("subscribeMarketInfo: makeTimeWindow error, Huobi Server error: Can not get server timestamp: %s", err.Error())
-		return nil, errors.New("")
+		return nil, 0, errors.New("")
 	}
-	toTime := int64(prevToTime + 60)
-
 	var divisor int64
 	var timeWindow [][]int64
 	switch period {
@@ -286,11 +307,11 @@ func makeTimeWindow(label string, period periodUnit) ([][]int64, error) {
 	default:
 		// month, year
 		divisor = 0
-		timeElement := []int64{startTime, toTime}
+		timeElement := []int64{startTime, int64(prevToTime)}
 		timeWindow = append(timeWindow, timeElement)
-		return timeWindow, nil
+		return timeWindow, 0, nil
 	}
-
+	toTime := int64(prevToTime) + divisor
 	dataLength := (toTime - startTime) / divisor // Here the residual is less than divisor, such as 50s(60s), 50min(1h)...
 	windowLength := dataLength / 300             // windowLength present how many slot of the period should be separated
 	for i := 0; int64(i) < windowLength; i++ {
@@ -305,7 +326,7 @@ func makeTimeWindow(label string, period periodUnit) ([][]int64, error) {
 		timeElement := []int64{startTime + windowLength*divisor*300, toTime}
 		timeWindow = append(timeWindow, timeElement)
 	}
-	return timeWindow, nil
+	return timeWindow, int(dataLength + 1), nil
 }
 
 // -------------------------------------------------------------ORDER-------------------------------------------------------
