@@ -142,7 +142,7 @@ func subscribeMarketInfo(label string) {
 									// here may happen a competition with resp.Data, double inert!!!
 									// OR
 									// restart and reload TickMap
-									applogger.Error("Conflict #%s-%s Tick(ts:%d, count:%d) in map has been inserted(ts:%d, count:%d) in DB,triggered by New Tick(ts:%d, count:%d).",
+									applogger.Info("Conflict #%s-%s Tick(ts:%d, count:%d) in map has been inserted(ts:%d, count:%d) in DB,triggered by New Tick(ts:%d, count:%d).",
 										symbol, period, previousTick.Id, previousTick.Count, tickCmp.Id, tickCmp.Count, tf.Id, tf.Count)
 									if tickCmp.Count < previousTick.Count {
 										selector := bson.M{"id": previousTick.Id}
@@ -196,7 +196,7 @@ func subscribeMarketInfo(label string) {
 							// And this tick exists in map, update TickMap
 							if t.Count <= tick.Count {
 								// disregard the old tick in this time
-								applogger.Error("Same time #%s-%s Tick received (ts:%d, count:%d) , but Tick in Map is (ts:%d, count:%d), ignore it.",
+								applogger.Info("Same time #%s-%s Tick received (ts:%d, count:%d) , but Tick in Map is (ts:%d, count:%d), ignore it.",
 									symbol, period, t.Id, t.Count, tick.Id, tick.Count)
 							} else {
 								// better tick, update TickMap
