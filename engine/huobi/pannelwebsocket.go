@@ -134,7 +134,7 @@ func subscribeMarketInfo(label string) {
 									// here may happen a competition with resp.Data, double inert!!!
 									tickCmp := &market.TickFloat{}
 									client.Find(bson.M{"id": previousTick.Id}).One(tickCmp) // must exist in db
-									applogger.Error("Conflict #%s Tick(ts:%d, count:%d) has been inerted (ts:%d, count:%d) ,triggered by New Tick(ts:%d, count:%d).",
+									applogger.Error("Conflict #%s Tick(ts:%d, count:%d) in map has been inerted(ts:%d, count:%d) in DB,triggered by New Tick(ts:%d, count:%d).",
 										symbol, previousTick.Id, previousTick.Count, tickCmp.Id, tickCmp.Count, tf.Id, tf.Count)
 									if tickCmp.Count < previousTick.Count {
 										selector := bson.M{"id": previousTick.Id}
