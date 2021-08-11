@@ -14,7 +14,7 @@ import (
 
 const (
 	TimerIntervalSecond   = 5
-	ReconnectWaitSecond   = 30
+	ReconnectWaitSecond   = 60
 	ReconnectWaitV2Second = 60 // as V2 ws client should build auth, that will take longer time initially
 
 	wsPath   = "/ws"

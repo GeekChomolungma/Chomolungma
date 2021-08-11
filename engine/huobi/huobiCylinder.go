@@ -46,21 +46,25 @@ func (HBCylinder *HuoBiCylinder) Ignite() {
 }
 
 func GetSyncStartTimestamp(collection string) (int64, error) {
+	// in PreviousSyncTimeMap
+	if startTime, ok := PreviousSyncTimeMap.Load(collection); ok {
+		return startTime.(int64), nil
+	}
+	// in db
 	s, err := db.CreateMarketDBSession()
 	if err != nil {
 		return 0, err
 	}
-	startTimeInt64 := int64(1627805769)
 	client := s.DB("marketinfo").C("HB-sync-timestamp")
 	pst := &dtos.PreviousSyncTime{}
 	err = client.Find(bson.M{"collectionname": collection}).One(pst)
-	if err != nil {
-		// not exist
-	} else {
+	startTimeInt64 := int64(1627805769)
+	if err == nil {
 		// got it
 		startTimeInt64 = pst.PreviousSyncTs
 	}
 	s.Close()
+	PreviousSyncTimeMap.Store(collection, startTimeInt64)
 	return startTimeInt64, nil
 }
 

@@ -10,7 +10,17 @@ import (
 )
 
 func main() {
+	mongo, err := mgo.Dial("mongodb://market:admin123@localhost:27017")
+	if err != nil {
+		applogger.Error("Failed to connect to db: %s", err.Error())
+		return
+	}
 
+	client := mongo.DB("marketinfo").C("HB-btcusdt-1min")
+	case2(client)
+}
+
+func case1(client *mgo.Collection) {
 	var t *market.Tick
 	if t == nil {
 		fmt.Println("t is nil", t)
@@ -27,19 +37,18 @@ func main() {
 		Count: 1234,
 	}
 
-	mongo, err := mgo.Dial("mongodb://market:admin123@localhost:27017")
-	if err != nil {
-		applogger.Error("Failed to connect to db: %s", err.Error())
-		return
-	}
-
-	client := mongo.DB("marketinfo").C("btcusdt")
-
 	// update the previous data
 	selector := bson.M{"id": 1626453720}
-	err = client.Update(selector, tmp)
+	err := client.Update(selector, tmp)
 	if err != nil {
 		applogger.Error("Failed to update to db: %s", err.Error())
 	}
+}
 
+func case2(client *mgo.Collection) {
+	tick := &market.TickFloat{}
+	iter := client.Find(nil).Sort("-id").Limit(10).Iter()
+	for iter.Next(tick) {
+		fmt.Println(tick.Id)
+	}
 }
