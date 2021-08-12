@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	"github.com/GeekChomolungma/Chomolungma/config"
 	"github.com/GeekChomolungma/Chomolungma/dtos"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi"
 	"github.com/gin-gonic/gin"
@@ -47,5 +48,14 @@ func getTimestamp(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"code": dtos.OK, "msg": "OK", "data": timestamp})
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"code": dtos.AIM_SITE_NOT_EXIST, "msg": "Sorry", "data": err.Error()})
+	}
+}
+
+func reloadKeys(c *gin.Context) {
+	ok := config.ReloadKeys()
+	if ok {
+		c.JSON(http.StatusOK, gin.H{"code": dtos.OK, "msg": "OK", "data": "reloaded keys."})
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"code": dtos.CANNOT_RELOAD_KEYS, "msg": "Sorry", "data": ""})
 	}
 }

@@ -371,11 +371,18 @@ func subOrderUpdateV2(symbol, accountID string) {
 		return
 	}
 
+	// seek secretKey with accountID
+	secretKey, err := SeekAccountSecretKey(accountID)
+	if err != nil {
+		applogger.Error("subOrderUpdateV2: SecretMap could not found key matches the accountID %s", accountID)
+		return
+	}
+
 	// Initialize a new instance
 	wsClient := new(orderwebsocketclient.SubscribeOrderWebSocketV2Client).Init(
 		config.GatewaySetting.GatewayHost,
 		accessKey,
-		config.HuoBiApiSetting.SecretKey,
+		secretKey,
 		config.HuoBiApiSetting.ApiServerHost,
 	)
 
