@@ -203,8 +203,8 @@ func subscribeMarketInfo(label string) {
 								tf := t.TickToFloat()
 								TickMap[t.Id] = tf
 
-								previousTime := timeList[len(timeList)-1]
-								if tf.Id < previousTime {
+								currentTime := timeList[len(timeList)-1]
+								if tf.Id < currentTime {
 									// if this tick not the top one, update into db
 									// tf is in tick map, but not the newest tick
 									tickCmp := &market.TickFloat{}
