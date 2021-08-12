@@ -136,6 +136,7 @@ func subscribeMarketInfo(label string) {
 										symbol, period, previousTick.Id, previousTick.Count, previousTick.Vol,
 										previousTick.Open, previousTick.High, previousTick.Low, previousTick.Close)
 								} else {
+									// LESS CHANCE HAPPEN: fixed the history write disk logic, no dirty from history action, so this will not happen.
 									// Old time item received, which time is less than timeList bottom item's,
 									// it suffered an long network delay(like 10*period), disregard it.
 									// OR
@@ -201,13 +202,18 @@ func subscribeMarketInfo(label string) {
 									symbol, period, t.Id, t.Count, tick.Id, tick.Count)
 							} else {
 								// better tick, update TickMap
+								// mostly, tick is the newest in tickmap
 								tf := t.TickToFloat()
 								TickMap[t.Id] = tf
 
 								currentTime := timeList[len(timeList)-1]
 								if tf.Id < currentTime {
+									// LESS CHANCE HAPPEN: Old tick received because of impossible network time delay,
+									//                     or when the newest tick created but the last tick suffer a small delay in net.
 									// if this tick not the top one, update into db
 									// tf is in tick map, but not the newest tick
+									applogger.Error("Old time #%s-%s Tick received (ts:%d, count:%d), but Tick in Map is (ts:%d, count:%d), and currentTime in TickMap is (ts:%d).",
+										symbol, period, tf.Id, tf.Count, tick.Id, tick.Count, currentTime)
 									tickCmp := &market.TickFloat{}
 									client.Find(bson.M{"id": tf.Id}).One(tickCmp) // must exist in db
 									if tickCmp.Count < tf.Count {
@@ -259,6 +265,7 @@ func subscribeMarketInfo(label string) {
 										symbol, period, tf.Id, tf.Count, tf.Vol, tf.Open, tf.High, tf.Low, tf.Close)
 								}
 							} else {
+								// LESS CHANCE HAPPEN: when restart and query history data with sync time flag.
 								// if exist, update it for sync.
 								// startTime should be equal to previousTick.Id
 								if tickCmp.Count < tf.Count {
