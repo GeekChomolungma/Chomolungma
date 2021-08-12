@@ -52,7 +52,7 @@ func subscribeMarketInfo(label string) {
 	// TickMap is a const size(like 5) flow window, to cache new tick received from remote,
 	// it can reduce pressure of DB read and write.
 	TickMap := make(map[int64]*market.TickFloat)
-	rwMutex := new(sync.RWMutex)
+	var bestHistoryTick *market.TickFloat
 
 	sp := strings.Split(label, "-") // label: HB-btcusdt-1min
 	symbol := sp[1]
@@ -73,6 +73,7 @@ func subscribeMarketInfo(label string) {
 		TickMap[ntick.Id] = ntick
 	}
 
+	rwMutex := new(sync.RWMutex)
 	// websocket
 	wsClient := new(marketwebsocketclient.CandlestickWebSocketClient).Init(config.GatewaySetting.GatewayHost)
 	wsClient.SetHandler(
@@ -234,6 +235,18 @@ func subscribeMarketInfo(label string) {
 						applogger.Info("Sync MarketInfo: WebSocket returned data, count=%d", len(resp.Data))
 						for _, t := range resp.Data {
 							tf := t.TickToFloat()
+							if bestHistoryTick == nil {
+								bestHistoryTick = tf
+								continue
+							}
+
+							if bestHistoryTick.Id < tf.Id {
+								// swap bestHistoryTick and tf
+								tmpTick := tf
+								tf = bestHistoryTick
+								bestHistoryTick = tmpTick
+							}
+
 							tickCmp := &market.TickFloat{}
 							err := client.Find(bson.M{"id": tf.Id}).One(tickCmp)
 							if err != nil {
@@ -243,7 +256,7 @@ func subscribeMarketInfo(label string) {
 									applogger.Error("Sync MarketInfo: Failed to connection #%s-%s db: %s", symbol, period, err.Error())
 								} else {
 									applogger.Info("Sync MarketInfo: Candlestick #%s-%s data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-										symbol, period, t.Id, t.Count, t.Vol, t.Open, t.High, t.Low, t.Close)
+										symbol, period, tf.Id, tf.Count, tf.Vol, tf.Open, tf.High, tf.Low, tf.Close)
 								}
 							} else {
 								// if exist, update it for sync.
@@ -255,12 +268,13 @@ func subscribeMarketInfo(label string) {
 										applogger.Error("Sync MarketInfo: Failed to update #%s-%s to db: %s", symbol, period, err.Error())
 									} else {
 										applogger.Info("Sync MarketInfo: Found Previous #%s-%s Data, Update to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-											symbol, period, t.Id, t.Count, t.Vol, t.Open, t.High, t.Low, t.Close)
+											symbol, period, tf.Id, tf.Count, tf.Vol, tf.Open, tf.High, tf.Low, tf.Close)
 									}
 								}
 							}
 						}
 						dataUnsynced = dataUnsynced - len(resp.Data)
+						applogger.Info("Sync MarketInfo: #%s-%s best history not synced(ts:%d, count:%d)", symbol, period, bestHistoryTick.Id, bestHistoryTick.Count)
 						applogger.Info("Sync MarketInfo: #%s-%s data wait to sync count = %d", symbol, period, dataUnsynced)
 					}
 					rwMutex.Unlock()
