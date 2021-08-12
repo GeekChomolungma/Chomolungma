@@ -248,6 +248,8 @@ func subscribeMarketInfo(label string) {
 
 							if bestHistoryTick.Id < tf.Id {
 								// swap bestHistoryTick and tf
+								// when reconnect, in the same time tf = best_id, subscribe logic will make data consistent.
+								//				   int the next time tf = best_id + 1, although, best's count will be incorrect, but this still work well.
 								tmpTick := tf
 								tf = bestHistoryTick
 								bestHistoryTick = tmpTick
@@ -265,7 +267,7 @@ func subscribeMarketInfo(label string) {
 										symbol, period, tf.Id, tf.Count, tf.Vol, tf.Open, tf.High, tf.Low, tf.Close)
 								}
 							} else {
-								// LESS CHANCE HAPPEN: when restart and query history data with sync time flag.
+								// LESS CHANCE HAPPEN: when restart, reconnect and query history data with sync time flag.
 								// if exist, update it for sync.
 								// startTime should be equal to previousTick.Id
 								if tickCmp.Count < tf.Count {
