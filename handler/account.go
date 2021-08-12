@@ -25,6 +25,22 @@ func getAccountInfo(c *gin.Context) {
 	}
 }
 
+func getAccountID(c *gin.Context) {
+	var Req dtos.HttpInternalAccountID
+	err := c.Bind(&Req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": dtos.CANNOT_PARSE_POST_BODY, "msg": "Sorry", "data": err.Error()})
+		return
+	}
+
+	switch Req.AimSite {
+	case "HuoBi":
+		huobi.GetAccountID(Req.AccessKey, Req.SecretKey)
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"code": dtos.AIM_SITE_NOT_EXIST, "msg": "Sorry", "data": err.Error()})
+	}
+}
+
 func getAccountBalance(c *gin.Context) {
 	var Req dtos.HttpReqModel
 	err := c.Bind(&Req)

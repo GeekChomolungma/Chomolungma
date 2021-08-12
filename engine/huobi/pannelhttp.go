@@ -49,6 +49,24 @@ func GetAccountInfo(accountID string) {
 	}
 }
 
+func GetAccountID(accessKey, secretKey string) {
+	httpClient := new(clients.AccountClient).Init(
+		config.GatewaySetting.GatewayHost,
+		accessKey,
+		secretKey,
+		config.HuoBiApiSetting.ApiServerHost,
+	)
+	resp, err := httpClient.GetAccountInfo()
+	if err != nil {
+		applogger.Error("GetAccountID: get account error: %s", err.Error())
+	} else {
+		applogger.Info("GetAccountID: get account, count=%d", len(resp))
+		for _, result := range resp {
+			applogger.Info("account: %+v", result)
+		}
+	}
+}
+
 func GetAccountBalance(accountID string) (*account.AccountBalance, error) {
 	// seek accessKey with accountID
 	accessKey, err := SeekAccountAccessKey(accountID)

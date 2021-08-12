@@ -18,6 +18,7 @@ func LocalServer() {
 	r.GET("/api/v1/commom/reloadkeys", reloadKeys)
 
 	// for account info
+	r.POST("/api/v1/account/accountid", getAccountID)
 	r.POST("/api/v1/account/accountinfo", getAccountInfo)
 	r.POST("/api/v1/account/accountbalance", getAccountBalance)
 
