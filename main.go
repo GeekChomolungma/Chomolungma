@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	_ "net/http/pprof"
 
 	"github.com/GeekChomolungma/Chomolungma/config"
 	"github.com/GeekChomolungma/Chomolungma/engine"
@@ -28,6 +31,8 @@ func main() {
 
 	// start http server
 	go handler.LocalServer()
+
+	go http.ListenAndServe(":6060", nil)
 
 	c := make(chan os.Signal, 5)
 	signal.Notify(c, os.Interrupt, os.Kill, syscall.SIGABRT, syscall.SIGTERM)

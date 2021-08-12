@@ -451,7 +451,7 @@ func TicksValidation(collectionName string) {
 		endTime = tickEnd.Id
 	}
 
-	dbCount, coutErr := client.Find(nil).Sort("id").Count()
+	dbCount, coutErr := client.Find(bson.M{"id": bson.M{"$lte": endTime}}).Count()
 	if coutErr != nil {
 		applogger.Error("TicksValidation: Failed to Count ticks, err: %s", err.Error())
 		return
