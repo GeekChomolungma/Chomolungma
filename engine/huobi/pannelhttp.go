@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/GeekChomolungma/Chomolungma/config"
 	"github.com/GeekChomolungma/Chomolungma/db"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/clients"
+	"github.com/GeekChomolungma/Chomolungma/engine/huobi/clients/marketwebsocketclient"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/account"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/common"
+	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/market"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/order"
 	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
 	"gopkg.in/mgo.v2/bson"
@@ -416,6 +419,96 @@ func querySymbolsAndWriteDisk() {
 			}
 		}
 	}
+}
+
+func TicksValidation(collectionName string) {
+	// Tick inconsistent validation count
+	incount := 0
+	dataReceived := 0
+	rwMutex := new(sync.RWMutex)
+
+	// connect market db
+	s, err := db.CreateMarketDBSession()
+	client := s.DB("marketinfo").C(collectionName)
+	if err != nil {
+		applogger.Error("subscribeMarketInfo: Failed to connection db, %s", err.Error())
+		return
+	}
+
+	var startTime int64
+	tickStart := &market.TickFloat{}
+	iterStart := client.Find(nil).Sort("id").Limit(1).Iter()
+	for iterStart.Next(tickStart) {
+		// start tick
+		startTime = tickStart.Id
+	}
+
+	var endTime int64
+	tickEnd := &market.TickFloat{}
+	iterEnd := client.Find(nil).Sort("-id").Limit(1).Iter()
+	for iterEnd.Next(tickEnd) {
+		// latest tick
+		endTime = tickEnd.Id
+	}
+
+	dbCount, coutErr := client.Find(nil).Sort("id").Count()
+	if coutErr != nil {
+		applogger.Error("TicksValidation: Failed to Count ticks, err: %s", err.Error())
+		return
+	}
+
+	sp := strings.Split(collectionName, "-") // label: HB-btcusdt-1min
+	symbol := sp[1]
+	period := periodUnit(sp[2])
+
+	timeWindow, datalength, err := timeWindowAtEndTime(collectionName, period, startTime, endTime)
+	if err != nil {
+		applogger.Error("timeWindowAtEndTime err: %s", err.Error())
+		return
+	}
+	applogger.Info("start:%d, to:%d. data to be received length is %d, in db length is %d, diff is %d", startTime, endTime, datalength, dbCount, datalength-dbCount)
+
+	wsClient := new(marketwebsocketclient.CandlestickWebSocketClient).Init(config.GatewaySetting.GatewayHost)
+	wsClient.SetHandler(
+		func() {
+			for _, timeEle := range timeWindow {
+				wsClient.Request(symbol, string(period), timeEle[0], timeEle[1], "2")
+			}
+		},
+		func(response interface{}) {
+			resp, ok := response.(market.SubscribeCandlestickResponse)
+			if ok {
+				rwMutex.Lock()
+				if &resp != nil {
+					if resp.Data != nil {
+						for _, t := range resp.Data {
+							tickCmp := &market.TickFloat{}
+							err := client.Find(bson.M{"id": t.Id}).One(tickCmp)
+							if err != nil {
+								applogger.Error("Tick not in DB, id: %d, count: %d", t.Id, t.Count)
+								incount++
+							} else {
+								tf := t.TickToFloat()
+								if *tf != *tickCmp {
+									applogger.Error("Inconsistent: Received/InDB Candlestick data, id: %d/%d, count: %d/%d, vol: %v/%v [%v-%v-%v-%v]/[%v-%v-%v-%v]",
+										t.Id, tickCmp.Id,
+										t.Count, tickCmp.Count,
+										t.Vol, tickCmp.Vol,
+										t.Open, t.Close, t.Low, t.High, tickCmp.Open, tickCmp.Close, tickCmp.Low, tickCmp.High)
+									incount++
+								}
+							}
+							dataReceived++
+						}
+					}
+				}
+				applogger.Info("TicksValidation: #%s-%s validation %d/%d, found Inconsistent count: %d", symbol, period, dataReceived, datalength, incount)
+				rwMutex.Unlock()
+			} else {
+				applogger.Warn("Unknown response: %v", resp)
+			}
+		})
+	wsClient.Connect(false)
 }
 
 func GetTimestamp() (int, error) {

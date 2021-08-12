@@ -352,6 +352,50 @@ func makeTimeWindow(label string, period periodUnit) ([][]int64, int, error) {
 	return timeWindow, int(dataLength + 1), nil
 }
 
+func timeWindowAtEndTime(label string, period periodUnit, startTime, endTime int64) ([][]int64, int, error) {
+	var divisor int64
+	var timeWindow [][]int64
+	switch period {
+	case Period_1min:
+		divisor = 60
+	case Period_5min:
+		divisor = 300
+	case Period_15min:
+		divisor = 900
+	case Period_30min:
+		divisor = 1800
+	case Period_60min:
+		divisor = 3600
+	case Period_4hour:
+		divisor = 14400
+	case Period_1day:
+		divisor = 86400
+	case Period_1week:
+		divisor = 604800
+	default:
+		// month, year
+		divisor = 0
+		timeElement := []int64{startTime, endTime}
+		timeWindow = append(timeWindow, timeElement)
+		return timeWindow, 0, nil
+	}
+
+	dataLength := ((endTime - startTime) / divisor) + 1
+	windowLength := dataLength / 300
+	for i := 0; int64(i) < windowLength; i++ {
+		start := startTime + int64(i)*300*divisor           // 0                  60*300
+		end := startTime + int64(i+1)*300*divisor - divisor // 60*300             60*300 + 60*300
+		timeElement := []int64{start, end}                  // [0:60:60*300)      [60*300:60:60*300*2)
+		timeWindow = append(timeWindow, timeElement)        // [) [) [) [) [)
+	}
+
+	startResidual := startTime + windowLength*300*divisor
+	timeElementResidual := []int64{startResidual, endTime}
+	timeWindow = append(timeWindow, timeElementResidual)
+
+	return timeWindow, int(dataLength), nil
+}
+
 // -------------------------------------------------------------ORDER-------------------------------------------------------
 func subOrderUpdateV2(symbol, accountID string) {
 	// connect market db
