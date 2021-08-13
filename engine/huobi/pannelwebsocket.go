@@ -348,12 +348,14 @@ func makeTimeWindow(label string, period periodUnit) ([][]int64, int, error) {
 		timeWindow = append(timeWindow, timeElement)
 	}
 
-	startResidual := startTime + windowLength*300*divisor
-	timeElementResidual := []int64{startResidual, toTime}
-	timeWindow = append(timeWindow, timeElementResidual)
-
-	applogger.Info("subscribeMarketInfo: timeWindow length is %d, start:%d, to:%d, datalength is %d.",
-		len(timeWindow), startTime, toTime, dataLength)
+	residual := dataLength % 300
+	if residual > 0 {
+		startResidual := startTime + windowLength*300*divisor
+		timeElementResidual := []int64{startResidual, toTime}
+		timeWindow = append(timeWindow, timeElementResidual)
+	}
+	applogger.Info("subscribeMarketInfo: timeWindow length is %d, start:%d, to:%d, datalength is %d. time window is %v",
+		len(timeWindow), startTime, toTime, dataLength, timeWindow)
 	return timeWindow, int(dataLength), nil
 }
 
@@ -394,10 +396,12 @@ func timeWindowAtEndTime(label string, period periodUnit, startTime, endTime int
 		timeWindow = append(timeWindow, timeElement)        // [) [) [) [) [)
 	}
 
-	startResidual := startTime + windowLength*300*divisor
-	timeElementResidual := []int64{startResidual, endTime}
-	timeWindow = append(timeWindow, timeElementResidual)
-
+	residual := dataLength % 300
+	if residual > 0 {
+		startResidual := startTime + windowLength*300*divisor
+		timeElementResidual := []int64{startResidual, endTime}
+		timeWindow = append(timeWindow, timeElementResidual)
+	}
 	return timeWindow, int(dataLength), nil
 }
 
