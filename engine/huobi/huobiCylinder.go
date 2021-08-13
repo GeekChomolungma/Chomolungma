@@ -58,7 +58,7 @@ func GetSyncStartTimestamp(collection string) (int64, error) {
 	client := s.DB("marketinfo").C("HB-sync-timestamp")
 	pst := &dtos.PreviousSyncTime{}
 	err = client.Find(bson.M{"collectionname": collection}).One(pst)
-	startTimeInt64 := int64(1627805769)
+	startTimeInt64 := int64(1627747200) // 2021-08-01 00:00:00, day, week, month tick is consistent here.
 	if err == nil {
 		// got it
 		startTimeInt64 = pst.PreviousSyncTs

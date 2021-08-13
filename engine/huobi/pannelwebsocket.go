@@ -45,7 +45,9 @@ const (
 func subscribeMarketInfo(label string) {
 	collectionName := label
 	var dataUnsynced int // data wait to sync number
-	duStayCount := 0     // if dataUnsynced keep one value for 5 times, we consider it as syned successfully
+	var dataToBeReceived int
+	dataReceived := 0
+	duStayCount := 0 // if dataUnsynced keep one value for 5 times, we consider it as syned successfully
 	duStay := 0
 	var timeList []int64 // TickMap auxiliary
 
@@ -85,7 +87,8 @@ func subscribeMarketInfo(label string) {
 				return
 			}
 			dataUnsynced = datalength
-			applogger.Info("subscribeMarketInfo: timeWindow length is %d, datalength is %d, data is %d", len(timeWindow), datalength, timeWindow)
+			dataToBeReceived = datalength
+			dataReceived = 0
 			wsClient.Subscribe(symbol, string(period), "1")
 
 			// multi request for data returned under 300 once.
@@ -283,8 +286,9 @@ func subscribeMarketInfo(label string) {
 							}
 						}
 						dataUnsynced = dataUnsynced - len(resp.Data)
+						dataReceived = dataReceived + len(resp.Data)
 						applogger.Info("Sync MarketInfo: #%s-%s best history not synced(ts:%d, count:%d)", symbol, period, bestHistoryTick.Id, bestHistoryTick.Count)
-						applogger.Info("Sync MarketInfo: #%s-%s data wait to sync count = %d", symbol, period, dataUnsynced)
+						applogger.Info("Sync MarketInfo: #%s-%s data wait to sync count: %d, synced: %d/%d", symbol, period, dataUnsynced, dataReceived, dataToBeReceived)
 					}
 					rwMutex.Unlock()
 				}
@@ -335,21 +339,22 @@ func makeTimeWindow(label string, period periodUnit) ([][]int64, int, error) {
 		return timeWindow, 0, nil
 	}
 	toTime := int64(prevToTime) + divisor
-	dataLength := (toTime - startTime) / divisor // Here the residual is less than divisor, such as 50s(60s), 50min(1h)...
-	windowLength := dataLength / 300             // windowLength present how many slot of the period should be separated
+	dataLength := ((toTime - startTime) / divisor) + 1 // Here the residual is less than divisor, such as 50s(60s), 50min(1h)...
+	windowLength := dataLength / 300                   // windowLength present how many slot of the period should be separated
 	for i := 0; int64(i) < windowLength; i++ {
 		start := startTime + int64(i)*divisor*300
-		end := startTime + int64(i+1)*divisor*300
+		end := startTime + int64(i+1)*divisor*300 - divisor
 		timeElement := []int64{start, end}
 		timeWindow = append(timeWindow, timeElement)
 	}
 
-	// add residual
-	if (startTime + windowLength*divisor*300) < toTime {
-		timeElement := []int64{startTime + windowLength*divisor*300, toTime}
-		timeWindow = append(timeWindow, timeElement)
-	}
-	return timeWindow, int(dataLength + 1), nil
+	startResidual := startTime + windowLength*300*divisor
+	timeElementResidual := []int64{startResidual, toTime}
+	timeWindow = append(timeWindow, timeElementResidual)
+
+	applogger.Info("subscribeMarketInfo: timeWindow length is %d, start:%d, to:%d, datalength is %d.",
+		len(timeWindow), startTime, toTime, dataLength)
+	return timeWindow, int(dataLength), nil
 }
 
 func timeWindowAtEndTime(label string, period periodUnit, startTime, endTime int64) ([][]int64, int, error) {
