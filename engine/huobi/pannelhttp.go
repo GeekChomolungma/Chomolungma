@@ -466,7 +466,7 @@ func TicksValidation(collectionName string) {
 		applogger.Error("timeWindowAtEndTime err: %s", err.Error())
 		return
 	}
-	applogger.Info("start:%d, to:%d. data to be received length is %d, in db length is %d, diff is %d", startTime, endTime, datalength, dbCount, datalength-dbCount)
+	applogger.Info("Collection: #%s, start:%d, to:%d. data to be received length is %d, in db length is %d, diff is %d", collectionName, startTime, endTime, datalength, dbCount, datalength-dbCount)
 
 	wsClient := new(marketwebsocketclient.CandlestickWebSocketClient).Init(config.GatewaySetting.GatewayHost)
 	wsClient.SetHandler(
