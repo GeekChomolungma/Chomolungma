@@ -247,9 +247,8 @@ func (p *WebSocketClientBase) readLoop() {
 						continue
 					}
 					if p.responseHandler != nil {
-						// release io for ping msg
-						// maybe too much goroutine created
-						go p.responseHandler(result)
+						// responseHandler should release io for ping msg
+						p.responseHandler(result)
 					}
 				}
 			}

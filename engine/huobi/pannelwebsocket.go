@@ -102,7 +102,6 @@ func subscribeMarketInfo(label string) {
 			resp, ok := response.(market.SubscribeCandlestickResponse)
 			if ok {
 				if &resp != nil {
-					rwMutex.Lock()
 					if resp.Tick != nil {
 						t := resp.Tick
 						if tick, exist := TickMap[t.Id]; !exist {
@@ -241,56 +240,59 @@ func subscribeMarketInfo(label string) {
 					// which are requested from startTime to toTime,
 					// are included in resp.Data
 					if resp.Data != nil {
-						applogger.Info("Sync MarketInfo: WebSocket returned data, count=%d", len(resp.Data))
-						for _, t := range resp.Data {
-							tf := t.TickToFloat()
-							if bestHistoryTick == nil {
-								bestHistoryTick = tf
-								continue
-							}
-
-							if bestHistoryTick.Id < tf.Id {
-								// swap bestHistoryTick and tf
-								// when reconnect, in the same time tf = best_id, subscribe logic will make data consistent.
-								//				   int the next time tf = best_id + 1, although, best's count will be incorrect, but this still work well.
-								tmpTick := tf
-								tf = bestHistoryTick
-								bestHistoryTick = tmpTick
-							}
-
-							tickCmp := &market.TickFloat{}
-							err := client.Find(bson.M{"id": tf.Id}).One(tickCmp)
-							if err != nil {
-								// if not exist, insert
-								err = client.Insert(tf)
-								if err != nil {
-									applogger.Error("Sync MarketInfo: Failed to connection #%s-%s db: %s", symbol, period, err.Error())
-								} else {
-									applogger.Info("Sync MarketInfo: Candlestick #%s-%s data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-										symbol, period, tf.Id, tf.Count, tf.Vol, tf.Open, tf.High, tf.Low, tf.Close)
+						go func() {
+							rwMutex.Lock()
+							applogger.Info("Sync MarketInfo: WebSocket returned data, count=%d", len(resp.Data))
+							for _, t := range resp.Data {
+								tf := t.TickToFloat()
+								if bestHistoryTick == nil {
+									bestHistoryTick = tf
+									continue
 								}
-							} else {
-								// LESS CHANCE HAPPEN: when restart, reconnect and query history data with sync time flag.
-								// if exist, update it for sync.
-								// startTime should be equal to previousTick.Id
-								if tickCmp.Count < tf.Count {
-									selector := bson.M{"id": tf.Id}
-									err := client.Update(selector, tf)
+
+								if bestHistoryTick.Id < tf.Id {
+									// swap bestHistoryTick and tf
+									// when reconnect, in the same time tf = best_id, subscribe logic will make data consistent.
+									//				   int the next time tf = best_id + 1, although, best's count will be incorrect, but this still work well.
+									tmpTick := tf
+									tf = bestHistoryTick
+									bestHistoryTick = tmpTick
+								}
+
+								tickCmp := &market.TickFloat{}
+								err := client.Find(bson.M{"id": tf.Id}).One(tickCmp)
+								if err != nil {
+									// if not exist, insert
+									err = client.Insert(tf)
 									if err != nil {
-										applogger.Error("Sync MarketInfo: Failed to update #%s-%s to db: %s", symbol, period, err.Error())
+										applogger.Error("Sync MarketInfo: Failed to connection #%s-%s db: %s", symbol, period, err.Error())
 									} else {
-										applogger.Info("Sync MarketInfo: Found Previous #%s-%s Data, Update to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+										applogger.Info("Sync MarketInfo: Candlestick #%s-%s data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
 											symbol, period, tf.Id, tf.Count, tf.Vol, tf.Open, tf.High, tf.Low, tf.Close)
+									}
+								} else {
+									// LESS CHANCE HAPPEN: when restart, reconnect and query history data with sync time flag.
+									// if exist, update it for sync.
+									// startTime should be equal to previousTick.Id
+									if tickCmp.Count < tf.Count {
+										selector := bson.M{"id": tf.Id}
+										err := client.Update(selector, tf)
+										if err != nil {
+											applogger.Error("Sync MarketInfo: Failed to update #%s-%s to db: %s", symbol, period, err.Error())
+										} else {
+											applogger.Info("Sync MarketInfo: Found Previous #%s-%s Data, Update to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
+												symbol, period, tf.Id, tf.Count, tf.Vol, tf.Open, tf.High, tf.Low, tf.Close)
+										}
 									}
 								}
 							}
-						}
-						dataUnsynced = dataUnsynced - len(resp.Data)
-						dataReceived = dataReceived + len(resp.Data)
-						applogger.Info("Sync MarketInfo: #%s-%s best history not synced(ts:%d, count:%d)", symbol, period, bestHistoryTick.Id, bestHistoryTick.Count)
-						applogger.Info("Sync MarketInfo: #%s-%s data wait to sync count: %d, synced: %d/%d", symbol, period, dataUnsynced, dataReceived, dataToBeReceived)
+							dataUnsynced = dataUnsynced - len(resp.Data)
+							dataReceived = dataReceived + len(resp.Data)
+							applogger.Info("Sync MarketInfo: #%s-%s best history not synced(ts:%d, count:%d)", symbol, period, bestHistoryTick.Id, bestHistoryTick.Count)
+							applogger.Info("Sync MarketInfo: #%s-%s data wait to sync count: %d, synced: %d/%d", symbol, period, dataUnsynced, dataReceived, dataToBeReceived)
+							rwMutex.Unlock()
+						}()
 					}
-					rwMutex.Unlock()
 				}
 			} else {
 				applogger.Warn("subscribeMarketInfo: Unknown response: %v", resp)

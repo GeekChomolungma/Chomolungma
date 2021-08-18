@@ -40,7 +40,7 @@ func (HBCylinder *HuoBiCylinder) Ignite() {
 		subscribeMarketInfo(label)
 	}
 
-	for accountID, _ := range config.AccountMap {
+	for accountID := range config.AccountMap {
 		subOrderUpdateV2("btcusdt", accountID)
 	}
 }
