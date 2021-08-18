@@ -53,7 +53,7 @@ func subscribeMarketInfo(label string) {
 
 	// TickMap is a const size(like 5) flow window, to cache new tick received from remote,
 	// it can reduce pressure of DB read and write.
-	TickMap := make(map[int64]*market.TickFloat)
+	TickMap := make(map[int64]market.TickFloat)
 	var bestHistoryTick *market.TickFloat
 
 	sp := strings.Split(label, "-") // label: HB-btcusdt-1min
@@ -69,9 +69,9 @@ func subscribeMarketInfo(label string) {
 		return
 	}
 
-	ntick := &market.TickFloat{}
+	ntick := market.TickFloat{}
 	iter := client.Find(nil).Sort("-id").Limit(5).Iter()
-	for iter.Next(ntick) {
+	for iter.Next(&ntick) {
 		TickMap[ntick.Id] = ntick
 	}
 
@@ -110,7 +110,7 @@ func subscribeMarketInfo(label string) {
 							// add current  tick into map
 							// add previous tick into db
 							tf := t.TickToFloat()
-							TickMap[t.Id] = tf
+							TickMap[t.Id] = *tf
 
 							// sort the key, increasing
 							for k := range TickMap {
@@ -147,8 +147,8 @@ func subscribeMarketInfo(label string) {
 									// here may happen a competition with resp.Data, double inert!!!
 									// OR
 									// restart and reload TickMap
-									applogger.Info("Conflict #%s-%s Tick(ts:%d, count:%d) in map has been inserted(ts:%d, count:%d) in DB,triggered by New Tick(ts:%d, count:%d).",
-										symbol, period, previousTick.Id, previousTick.Count, tickCmp.Id, tickCmp.Count, tf.Id, tf.Count)
+									applogger.Info("Conflict #%s-%s Tick(ts:%d, count:%d) in map (timelist: %v) has been inserted in DB(ts:%d, count:%d),triggered by New Tick(ts:%d, count:%d).",
+										symbol, period, previousTick.Id, previousTick.Count, timeList, tickCmp.Id, tickCmp.Count, tf.Id, tf.Count)
 									if tickCmp.Count < previousTick.Count {
 										selector := bson.M{"id": previousTick.Id}
 										err := client.Update(selector, previousTick)
@@ -207,7 +207,7 @@ func subscribeMarketInfo(label string) {
 								// better tick, update TickMap
 								// mostly, tick is the newest in tickmap
 								tf := t.TickToFloat()
-								TickMap[t.Id] = tf
+								TickMap[t.Id] = *tf
 
 								currentTime := timeList[len(timeList)-1]
 								if tf.Id < currentTime {
