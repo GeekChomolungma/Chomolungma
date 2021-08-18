@@ -69,7 +69,7 @@ func GetSyncStartTimestamp(collection string) (int64, error) {
 }
 
 func (HBCylinder *HuoBiCylinder) Flush() {
-	FlushDuration = 300
+	FlushDuration = 3600
 	go flushPerSecond(FlushDuration)
 }
 
