@@ -45,27 +45,30 @@ func (HBCylinder *HuoBiCylinder) Ignite() {
 	}
 }
 
-func GetSyncStartTimestamp(collection string) (int64, error) {
+func GetSyncStartTimestamp(collection string) int64 {
 	// in PreviousSyncTimeMap
 	if startTime, ok := PreviousSyncTimeMap.Load(collection); ok {
-		return startTime.(int64), nil
+		return startTime.(int64)
 	}
+
+	// 2021-08-01 00:00:00, day, week, month tick is consistent here.
+	startTimeInt64 := int64(1627747200)
+
 	// in db
 	s, err := db.CreateMarketDBSession()
 	if err != nil {
-		return 0, err
+		return startTimeInt64
 	}
 	client := s.DB("marketinfo").C("HB-sync-timestamp")
 	pst := &dtos.PreviousSyncTime{}
 	err = client.Find(bson.M{"collectionname": collection}).One(pst)
-	startTimeInt64 := int64(1627747200) // 2021-08-01 00:00:00, day, week, month tick is consistent here.
 	if err == nil {
 		// got it
 		startTimeInt64 = pst.PreviousSyncTs
 	}
 	s.Close()
 	PreviousSyncTimeMap.Store(collection, startTimeInt64)
-	return startTimeInt64, nil
+	return startTimeInt64
 }
 
 func (HBCylinder *HuoBiCylinder) Flush() {

@@ -1,7 +1,6 @@
 package huobi
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -44,11 +43,10 @@ const (
 // splits the duration into multi 300-size slots.
 func subscribeMarketInfo(label string) {
 	collectionName := label
-	var dataUnsynced int // data wait to sync number
-	var dataToBeReceived int
-	dataReceived := 0
-	duStayCount := 0 // if dataUnsynced keep one value for 5 times, we consider it as syned successfully
-	duStay := 0
+	var endTs int64
+	DataAlreadySync := false
+	subStart := false
+
 	var timeList []int64 // TickMap auxiliary
 
 	// TickMap is a const size(like 5) flow window, to cache new tick received from remote,
@@ -80,30 +78,28 @@ func subscribeMarketInfo(label string) {
 	wsClient := new(marketwebsocketclient.CandlestickWebSocketClient).Init(config.GatewaySetting.GatewayHost)
 	wsClient.SetHandler(
 		func() {
+			subStart = false
 			applogger.Info("subscribeMarketInfo: HuoBi MarketInfo subscription #%s, K-period %s.", symbol, period)
-			// caculate a sync time window
-			timeWindow, datalength, err := makeTimeWindow(label, period)
-			if err != nil {
-				return
-			}
-			dataUnsynced = datalength
-			dataToBeReceived = datalength
-			dataReceived = 0
 			wsClient.Subscribe(symbol, string(period), "1")
-
-			// multi request for data returned under 300 once.
-			// whatever the period is, request should make sure that
-			// the res return data length less than 300.
-			for _, timeEle := range timeWindow {
-				wsClient.Request(symbol, string(period), timeEle[0], timeEle[1], "2")
-			}
 		},
+
 		func(response interface{}) {
 			resp, ok := response.(market.SubscribeCandlestickResponse)
 			if ok {
 				if &resp != nil {
 					if resp.Tick != nil {
 						t := resp.Tick
+						// start sync once
+						if !subStart {
+							subStart = true
+							endTs = t.Id
+							applogger.Info("Sync MarketInfo: #%s-%s sync start, current timestamp is %d", symbol, period, endTs)
+
+							// caculate a sync time window
+							startTime := GetSyncStartTimestamp(label)
+							DataAlreadySync = syncHistory(label, startTime, endTs, wsClient)
+						}
+
 						if tick, exist := TickMap[t.Id]; !exist {
 							// new time item OR too old item OR start/restart program
 							// add current  tick into map
@@ -112,6 +108,7 @@ func subscribeMarketInfo(label string) {
 							TickMap[t.Id] = *tf
 
 							// sort the key, increasing
+							timeList = nil
 							for k := range TickMap {
 								timeList = append(timeList, k)
 							}
@@ -167,10 +164,7 @@ func subscribeMarketInfo(label string) {
 							if len(timeList) > 5 {
 								// add PreviousSyncTime into map
 								// TODO: should confirm all resp.Data are synced, else the unsynced part will lose.
-								//       here 3 will be considered for different period.
-								printSyncStay := true
-								if dataUnsynced <= 3 || duStayCount > 3 {
-									printSyncStay = false
+								if DataAlreadySync {
 									bottomTime := timeList[0]
 									if SyncID, ok := PreviousSyncTimeMap.Load(collectionName); !ok {
 										PreviousSyncTimeMap.Store(collectionName, bottomTime)
@@ -184,16 +178,8 @@ func subscribeMarketInfo(label string) {
 									}
 								}
 
-								if duStay == dataUnsynced && printSyncStay {
-									duStayCount++
-									applogger.Info("subscribeMarketInfo: #%s-%s data unsynced stay %d for %d time", symbol, period, dataUnsynced, duStayCount)
-								} else {
-									duStay = dataUnsynced
-								}
-
 								// only keep the 5 pass time items
 								delete(TickMap, timeList[0])
-								timeList = timeList[1:]
 							}
 						} else {
 							// old tick received.
@@ -242,7 +228,7 @@ func subscribeMarketInfo(label string) {
 					if resp.Data != nil {
 						go func() {
 							rwMutex.Lock()
-							applogger.Info("Sync MarketInfo: WebSocket returned data, count=%d", len(resp.Data))
+							applogger.Info("Sync MarketInfo: WebSocket returned #%s-%s data, count: %d", symbol, period, len(resp.Data))
 							for _, t := range resp.Data {
 								tf := t.TickToFloat()
 								if bestHistoryTick == nil {
@@ -286,10 +272,17 @@ func subscribeMarketInfo(label string) {
 									}
 								}
 							}
-							dataUnsynced = dataUnsynced - len(resp.Data)
-							dataReceived = dataReceived + len(resp.Data)
+
 							applogger.Info("Sync MarketInfo: #%s-%s best history not synced(ts:%d, count:%d)", symbol, period, bestHistoryTick.Id, bestHistoryTick.Count)
-							applogger.Info("Sync MarketInfo: #%s-%s data wait to sync count: %d, synced: %d/%d", symbol, period, dataUnsynced, dataReceived, dataToBeReceived)
+							sort.Slice(resp.Data, func(i, j int) bool {
+								return resp.Data[i].Id < resp.Data[j].Id
+							})
+
+							DataAlreadySync = syncHistory(label, resp.Data[len(resp.Data)-1].Id, endTs, wsClient)
+							if DataAlreadySync {
+								PreviousSyncTimeMap.Store(collectionName, resp.Data[len(resp.Data)-1].Id)
+								applogger.Info("Sync MarketInfo: #%s-%s all history data synced finished, update ts: %d into PreviousSyncTimeMap.", symbol, period, resp.Data[len(resp.Data)-1].Id)
+							}
 							rwMutex.Unlock()
 						}()
 					}
@@ -303,19 +296,30 @@ func subscribeMarketInfo(label string) {
 	wsCandlestickClientMap[collectionName] = wsClient
 }
 
-func makeTimeWindow(label string, period periodUnit) ([][]int64, int, error) {
-	startTime, err := GetSyncStartTimestamp(label)
-	if err != nil {
-		applogger.Error("subscribeMarketInfo: makeTimeWindow error, Can not connect mongodb for timestamp: %s", err.Error())
-		return nil, 0, errors.New("")
+func syncHistory(label string, startTime, endTs int64, wsClient *marketwebsocketclient.CandlestickWebSocketClient) bool {
+	sp := strings.Split(label, "-") // label: HB-btcusdt-1min
+	symbol := sp[1]
+	period := periodUnit(sp[2])
+	timeWindow, _ := calcuFirstTimeWindow(label, startTime, endTs)
+	alreadySync := false
+	if timeWindow == nil {
+		alreadySync = true
+	} else {
+		// multi request for data returned under 300 once.
+		// whatever the period is, request should make sure that
+		// the res return data length less than 300.
+		wsClient.Request(symbol, string(period), timeWindow[0], timeWindow[1], "2")
+		applogger.Info("Sync MarketInfo: #%s-%s sync req sent, from:%d, to:%d", symbol, period, timeWindow[0], timeWindow[1])
 	}
-	prevToTime, err := GetTimestamp()
-	if err != nil {
-		applogger.Error("subscribeMarketInfo: makeTimeWindow error, Huobi Server error: Can not get server timestamp: %s", err.Error())
-		return nil, 0, errors.New("")
-	}
+	return alreadySync
+}
+
+func calcuFirstTimeWindow(label string, startTs, endTs int64) ([]int64, int) {
+	sp := strings.Split(label, "-") // label: HB-btcusdt-1min
+	symbol := sp[1]
+	period := periodUnit(sp[2])
 	var divisor int64
-	var timeWindow [][]int64
+	var timeWindow []int64
 	switch period {
 	case Period_1min:
 		divisor = 60
@@ -333,32 +337,36 @@ func makeTimeWindow(label string, period periodUnit) ([][]int64, int, error) {
 		divisor = 86400
 	case Period_1week:
 		divisor = 604800
-	default:
-		// month, year
-		divisor = 0
-		timeElement := []int64{startTime, int64(prevToTime)}
-		timeWindow = append(timeWindow, timeElement)
-		return timeWindow, 0, nil
-	}
-	toTime := int64(prevToTime) + divisor
-	dataLength := ((toTime - startTime) / divisor) + 1 // Here the residual is less than divisor, such as 50s(60s), 50min(1h)...
-	windowLength := dataLength / 300                   // windowLength present how many slot of the period should be separated
-	for i := 0; int64(i) < windowLength; i++ {
-		start := startTime + int64(i)*divisor*300
-		end := startTime + int64(i+1)*divisor*300 - divisor
-		timeElement := []int64{start, end}
-		timeWindow = append(timeWindow, timeElement)
 	}
 
-	residual := dataLength % 300
-	if residual > 0 {
-		startResidual := startTime + windowLength*300*divisor
-		timeElementResidual := []int64{startResidual, toTime}
-		timeWindow = append(timeWindow, timeElementResidual)
+	if startTs != int64(1627747200) {
+		// db has inited
+		// if startTs is 1627747200, it means db does not have that init data.
+		startTs = startTs + divisor
 	}
-	applogger.Info("subscribeMarketInfo: timeWindow length is %d, start:%d, to:%d, datalength is %d. time window is %v",
-		len(timeWindow), startTime, toTime, dataLength, timeWindow)
-	return timeWindow, int(dataLength), nil
+
+	if (startTs + divisor) >= endTs {
+		applogger.Info("subscribeMarketInfo: #%s-%s sync finish data length is %d, start:%d, to:%d.",
+			symbol, period, len(timeWindow), startTs, endTs)
+		return nil, 0
+	}
+
+	tsResidual := endTs % divisor
+	if tsResidual != 0 {
+		applogger.Error("subscribeMarketInfo: #%s-%s makeTimeWindowWithEndTs error, received unmatchable end timestamp for sync: %d", symbol, period, endTs)
+	}
+
+	dataLength := (endTs-startTs)/divisor + 1
+	if dataLength > 300 {
+		dataLength = 300
+		timeWindow = []int64{startTs, startTs + 299*divisor}
+	} else {
+		timeWindow = []int64{startTs, endTs}
+	}
+
+	applogger.Info("subscribeMarketInfo: #%s-%s timeWindow length is %d, start:%d, to:%d, datalength is %d. time window is %v",
+		symbol, period, len(timeWindow), timeWindow[0], timeWindow[1], dataLength, timeWindow)
+	return timeWindow, int(dataLength)
 }
 
 func timeWindowAtEndTime(label string, period periodUnit, startTime, endTime int64) ([][]int64, int, error) {
