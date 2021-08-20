@@ -73,6 +73,7 @@ func subscribeMarketInfo(label string) {
 			subStart = false
 
 			// init TickMap
+			TickMap = make(map[int64]market.TickFloat)
 			ntick := market.TickFloat{}
 			iter := client.Find(nil).Sort("-id").Limit(5).Iter()
 			for iter.Next(&ntick) {
