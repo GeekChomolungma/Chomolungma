@@ -46,13 +46,11 @@ func subscribeMarketInfo(label string) {
 	var endTs int64
 	DataAlreadySync := false
 	subStart := false
-
 	var timeList []int64 // TickMap auxiliary
 
 	// TickMap is a const size(like 5) flow window, to cache new tick received from remote,
 	// it can reduce pressure of DB read and write.
 	TickMap := make(map[int64]market.TickFloat)
-	var bestHistoryTick *market.TickFloat
 
 	sp := strings.Split(label, "-") // label: HB-btcusdt-1min
 	symbol := sp[1]
@@ -231,18 +229,10 @@ func subscribeMarketInfo(label string) {
 							applogger.Info("Sync MarketInfo: WebSocket returned #%s-%s data, count: %d", symbol, period, len(resp.Data))
 							for _, t := range resp.Data {
 								tf := t.TickToFloat()
-								if bestHistoryTick == nil {
-									bestHistoryTick = tf
+								if tf.Id >= endTs {
+									// over endTs means the data is endTs
+									// it's not history but in subscribing now.
 									continue
-								}
-
-								if bestHistoryTick.Id < tf.Id {
-									// swap bestHistoryTick and tf
-									// when reconnect, in the same time tf = best_id, subscribe logic will make data consistent.
-									//				   int the next time tf = best_id + 1, although, best's count will be incorrect, but this still work well.
-									tmpTick := tf
-									tf = bestHistoryTick
-									bestHistoryTick = tmpTick
 								}
 
 								tickCmp := &market.TickFloat{}
@@ -273,14 +263,12 @@ func subscribeMarketInfo(label string) {
 								}
 							}
 
-							applogger.Info("Sync MarketInfo: #%s-%s best history not synced(ts:%d, count:%d)", symbol, period, bestHistoryTick.Id, bestHistoryTick.Count)
 							sort.Slice(resp.Data, func(i, j int) bool {
 								return resp.Data[i].Id < resp.Data[j].Id
 							})
 
 							DataAlreadySync = syncHistory(label, resp.Data[len(resp.Data)-1].Id, endTs, wsClient)
 							if DataAlreadySync {
-								PreviousSyncTimeMap.Store(collectionName, resp.Data[len(resp.Data)-1].Id)
 								applogger.Info("Sync MarketInfo: #%s-%s all history data synced finished, update ts: %d into PreviousSyncTimeMap.", symbol, period, resp.Data[len(resp.Data)-1].Id)
 							}
 							rwMutex.Unlock()
@@ -309,7 +297,7 @@ func syncHistory(label string, startTime, endTs int64, wsClient *marketwebsocket
 		// whatever the period is, request should make sure that
 		// the res return data length less than 300.
 		wsClient.Request(symbol, string(period), timeWindow[0], timeWindow[1], "2")
-		applogger.Info("Sync MarketInfo: #%s-%s sync req sent, from:%d, to:%d", symbol, period, timeWindow[0], timeWindow[1])
+		applogger.Info("Sync MarketInfo: #%s-%s sync req sent, start: %d, end: %d, but from:%d, to:%d", symbol, period, startTime, endTs, timeWindow[0], timeWindow[1])
 	}
 	return alreadySync
 }
