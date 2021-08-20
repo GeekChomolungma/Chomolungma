@@ -194,7 +194,7 @@ func subscribeMarketInfo(label string) {
 								// mostly, tick is the newest in tickmap
 								tf := t.TickToFloat()
 								TickMap[t.Id] = *tf
-								applogger.Info("Same time #%s-%s Tick received (ts:%d, count:%d) , is better than Tick in Map is (ts:%d, count:%d), update tick map.",
+								applogger.Debug("Same time #%s-%s Tick received (ts:%d, count:%d) , is better than Tick in Map is (ts:%d, count:%d), update tick map.",
 									symbol, period, t.Id, t.Count, tick.Id, tick.Count)
 
 								currentTime := timeList[len(timeList)-1]
