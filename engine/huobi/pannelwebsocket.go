@@ -65,18 +65,20 @@ func subscribeMarketInfo(label string) {
 		return
 	}
 
-	ntick := market.TickFloat{}
-	iter := client.Find(nil).Sort("-id").Limit(5).Iter()
-	for iter.Next(&ntick) {
-		TickMap[ntick.Id] = ntick
-	}
-
 	rwMutex := new(sync.RWMutex)
 	// websocket
 	wsClient := new(marketwebsocketclient.CandlestickWebSocketClient).Init(config.GatewaySetting.GatewayHost)
 	wsClient.SetHandler(
 		func() {
 			subStart = false
+
+			// init TickMap
+			ntick := market.TickFloat{}
+			iter := client.Find(nil).Sort("-id").Limit(5).Iter()
+			for iter.Next(&ntick) {
+				TickMap[ntick.Id] = ntick
+			}
+
 			applogger.Info("subscribeMarketInfo: HuoBi MarketInfo subscription #%s, K-period %s.", symbol, period)
 			wsClient.Subscribe(symbol, string(period), "1")
 		},
@@ -191,6 +193,8 @@ func subscribeMarketInfo(label string) {
 								// mostly, tick is the newest in tickmap
 								tf := t.TickToFloat()
 								TickMap[t.Id] = *tf
+								applogger.Info("Same time #%s-%s Tick received (ts:%d, count:%d) , is better than Tick in Map is (ts:%d, count:%d), update tick map.",
+									symbol, period, t.Id, t.Count, tick.Id, tick.Count)
 
 								currentTime := timeList[len(timeList)-1]
 								if tf.Id < currentTime {
@@ -232,8 +236,12 @@ func subscribeMarketInfo(label string) {
 								if tf.Id >= endTs {
 									// over endTs means the data is endTs
 									// it's not history but in subscribing now.
+									applogger.Info("Sync MarketInfo: #%s-%s history tick received(ts: %d) is later than or equal to the first sub tick(ts: %d), skip it.",
+										symbol, period, tf.Id, endTs)
 									continue
 								}
+								applogger.Info("Sync MarketInfo: #%s-%s history tick received(ts: %d) is earlier than the first sub tick(ts: %d), try to insert it.",
+									symbol, period, tf.Id, endTs)
 
 								tickCmp := &market.TickFloat{}
 								err := client.Find(bson.M{"id": tf.Id}).One(tickCmp)
