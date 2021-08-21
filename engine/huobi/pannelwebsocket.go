@@ -136,26 +136,23 @@ func subscribeMarketInfo(label string) {
 										symbol, period, previousTick.Id, previousTick.Count, previousTick.Vol,
 										previousTick.Open, previousTick.High, previousTick.Low, previousTick.Close)
 								} else {
-									// LESS CHANCE HAPPEN: fixed the history write disk logic, no dirty from history action, so this will not happen.
-									// Old time item received, which time is less than timeList bottom item's,
-									// it suffered an long network delay(like 10*period), disregard it.
-									// OR
-									// Newest time Conflict with resp.Data received.
-									// here may happen a competition with resp.Data, double inert!!!
-									// OR
-									// restart and reload TickMap
-									applogger.Info("Conflict #%s-%s Tick(ts:%d, count:%d) in map (timelist: %v) has been inserted in DB(ts:%d, count:%d),triggered by New Tick(ts:%d, count:%d).",
-										symbol, period, previousTick.Id, previousTick.Count, timeList, tickCmp.Id, tickCmp.Count, tf.Id, tf.Count)
 									if tickCmp.Count < previousTick.Count {
+										// LESS CHANCE HAPPEN: fixed the history write disk logic, no dirty from history action, so this will not happen.
+										// Old time item received, which time is less than timeList bottom item's,
+										// it suffered an long network delay(like 5*period), disregard it.
+										// OR
+										// previousTick time Conflict with resp.Data inerted: when resp.Data inconsistent with resp.Tick.
 										selector := bson.M{"id": previousTick.Id}
 										err := client.Update(selector, previousTick)
 										if err != nil {
 											applogger.Error("Failed to Update #%s-%s Tick: id: %d, count: %d, errmsg: %s",
 												symbol, period, previousTick.Id, previousTick.Count, err.Error())
 										} else {
-											applogger.Info("Previous #%s-%s Tick Updated into DB: id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-												symbol, period, previousTick.Id, previousTick.Count, previousTick.Vol,
-												previousTick.Open, previousTick.High, previousTick.Low, previousTick.Close)
+											applogger.Info("Conflict #%s-%s Tick in map (ts:%d, count:%d, vol:%v [%v-%v-%v-%v] with timelist: %v) is better than Tick inserted in DB(ts:%d, count:%d, vol:%v [%v-%v-%v-%v]),triggered by New Tick(ts:%d, count:%d), updated db.",
+												symbol, period,
+												previousTick.Id, previousTick.Count, previousTick.Vol, previousTick.Open, previousTick.High, previousTick.Low, previousTick.Close, timeList,
+												tickCmp.Id, tickCmp.Count, tickCmp.Vol, tickCmp.Open, tickCmp.High, tickCmp.Low, tickCmp.Close,
+												tf.Id, tf.Count)
 										}
 									}
 								}
@@ -183,8 +180,8 @@ func subscribeMarketInfo(label string) {
 								delete(TickMap, timeList[0])
 							}
 						} else {
-							// old tick received.
-							// And this tick exists in map, update TickMap
+							// old tick exist in map received.
+							// Update TickMap
 							if t.Count <= tick.Count {
 								// disregard the old tick in this time
 								applogger.Info("Same time #%s-%s Tick received (ts:%d, count:%d) , but Tick in Map is (ts:%d, count:%d), ignore it.",
@@ -278,7 +275,7 @@ func subscribeMarketInfo(label string) {
 
 							DataAlreadySync = syncHistory(label, resp.Data[len(resp.Data)-1].Id, endTs, wsClient)
 							if DataAlreadySync {
-								applogger.Info("Sync MarketInfo: #%s-%s all history data synced finished, update ts: %d into PreviousSyncTimeMap.", symbol, period, resp.Data[len(resp.Data)-1].Id)
+								applogger.Info("Sync MarketInfo: #%s-%s all history data synced finished, latest ts: %d.", symbol, period, resp.Data[len(resp.Data)-1].Id)
 							}
 							rwMutex.Unlock()
 						}()
