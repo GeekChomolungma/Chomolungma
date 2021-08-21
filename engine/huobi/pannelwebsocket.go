@@ -80,7 +80,7 @@ func subscribeMarketInfo(label string) {
 				TickMap[ntick.Id] = ntick
 			}
 
-			applogger.Info("subscribeMarketInfo: HuoBi MarketInfo subscription #%s, K-period %s.", symbol, period)
+			applogger.Info("subscribeMarketInfo: HuoBi MarketInfo subscription #%s-%s.", symbol, period)
 			wsClient.Subscribe(symbol, string(period), "1")
 		},
 
