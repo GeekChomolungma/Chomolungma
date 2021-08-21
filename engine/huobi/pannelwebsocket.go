@@ -238,8 +238,6 @@ func subscribeMarketInfo(label string) {
 										symbol, period, tf.Id, endTs)
 									continue
 								}
-								applogger.Info("Sync MarketInfo: #%s-%s history tick received(ts: %d) is earlier than the first sub tick(ts: %d), try to insert it.",
-									symbol, period, tf.Id, endTs)
 
 								tickCmp := &market.TickFloat{}
 								err := client.Find(bson.M{"id": tf.Id}).One(tickCmp)
@@ -249,8 +247,8 @@ func subscribeMarketInfo(label string) {
 									if err != nil {
 										applogger.Error("Sync MarketInfo: Failed to connection #%s-%s db: %s", symbol, period, err.Error())
 									} else {
-										applogger.Info("Sync MarketInfo: Candlestick #%s-%s data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-											symbol, period, tf.Id, tf.Count, tf.Vol, tf.Open, tf.High, tf.Low, tf.Close)
+										applogger.Info("Sync MarketInfo: Candlestick #%s-%s data write to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v], the first sub tick(ts: %d)",
+											symbol, period, tf.Id, tf.Count, tf.Vol, tf.Open, tf.High, tf.Low, tf.Close, endTs)
 									}
 								} else {
 									// LESS CHANCE HAPPEN: when restart, reconnect and query history data with sync time flag.
@@ -262,8 +260,8 @@ func subscribeMarketInfo(label string) {
 										if err != nil {
 											applogger.Error("Sync MarketInfo: Failed to update #%s-%s to db: %s", symbol, period, err.Error())
 										} else {
-											applogger.Info("Sync MarketInfo: Found Previous #%s-%s Data, Update to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v]",
-												symbol, period, tf.Id, tf.Count, tf.Vol, tf.Open, tf.High, tf.Low, tf.Close)
+											applogger.Info("Sync MarketInfo: Found Previous #%s-%s Data, Update to db, id: %d, count: %d, vol: %v [%v-%v-%v-%v], the first sub tick(ts: %d)",
+												symbol, period, tf.Id, tf.Count, tf.Vol, tf.Open, tf.High, tf.Low, tf.Close, endTs)
 										}
 									}
 								}
