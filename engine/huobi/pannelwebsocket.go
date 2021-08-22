@@ -361,9 +361,10 @@ func calcuFirstTimeWindow(label string, startTs, endTs int64) ([]int64, int) {
 	return timeWindow, int(dataLength)
 }
 
-func timeWindowAtEndTime(label string, period periodUnit, startTime, endTime int64) ([][]int64, int) {
+func timeWindowAtEndTime(label string, period periodUnit, startTime, endTime int64) ([][]int64, int, map[int64]int) {
 	var divisor int64
 	var timeWindow [][]int64
+	TickExpMap := make(map[int64]int)
 	switch period {
 	case Period_1min:
 		divisor = 60
@@ -386,7 +387,7 @@ func timeWindowAtEndTime(label string, period periodUnit, startTime, endTime int
 		divisor = 0
 		timeElement := []int64{startTime, endTime}
 		timeWindow = append(timeWindow, timeElement)
-		return timeWindow, 0
+		return timeWindow, 0, TickExpMap
 	}
 
 	dataLength := ((endTime - startTime) / divisor) + 1
@@ -405,10 +406,10 @@ func timeWindowAtEndTime(label string, period periodUnit, startTime, endTime int
 		timeWindow = append(timeWindow, timeElementResidual)
 	}
 
-	// for i := 0; i < int(dataLength); i++ {
-	// 	TickExpMap[startTime+int64(i)*divisor] = 0
-	// }
-	return timeWindow, int(dataLength)
+	for i := 0; i < int(dataLength); i++ {
+		TickExpMap[startTime+int64(i)*divisor] = 0
+	}
+	return timeWindow, int(dataLength), TickExpMap
 }
 
 // -------------------------------------------------------------ORDER-------------------------------------------------------

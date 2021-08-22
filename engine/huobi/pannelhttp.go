@@ -461,7 +461,7 @@ func TicksValidation(collectionName string) {
 	symbol := sp[1]
 	period := periodUnit(sp[2])
 
-	timeWindow, datalength := timeWindowAtEndTime(collectionName, period, startTime, endTime)
+	timeWindow, datalength, tickExpMap := timeWindowAtEndTime(collectionName, period, startTime, endTime)
 	applogger.Info("Collection: #%s, start:%d, to:%d. data to be received length is %d, in db length is %d, diff is %d", collectionName, startTime, endTime, datalength, dbCount, datalength-dbCount)
 
 	wsClient := new(marketwebsocketclient.CandlestickWebSocketClient).Init(config.GatewaySetting.GatewayHost)
@@ -470,6 +470,7 @@ func TicksValidation(collectionName string) {
 			for _, timeEle := range timeWindow {
 				wsClient.Request(symbol, string(period), timeEle[0], timeEle[1], "2")
 			}
+			wsClient.Request(symbol, string(period), 1629531900, 1629546600+600, "2") //
 		},
 		func(response interface{}) {
 			resp, ok := response.(market.SubscribeCandlestickResponse)
@@ -477,7 +478,6 @@ func TicksValidation(collectionName string) {
 				rwMutex.Lock()
 				if &resp != nil {
 					if resp.Data != nil {
-						//applogger.Info("Resp: #%s-%s received, from: %d, to: %d", symbol, period, resp.Data[0].Id, resp.Data[len(resp.Data)-1].Id)
 						for _, t := range resp.Data {
 							tickCmp := &market.TickFloat{}
 							err := client.Find(bson.M{"id": t.Id}).One(tickCmp)
@@ -497,15 +497,15 @@ func TicksValidation(collectionName string) {
 								}
 							}
 							dataReceived++
-							// if v, exist := tickExpMap[t.Id]; !exist {
-							// 	// no exist, print error!
-							// 	applogger.Error("Not Exp: Received #%s-%s Candlestick data, not exist in exp map, id: %d", symbol, period, t.Id)
-							// } else {
-							// 	if v >= 1 {
-							// 		applogger.Error("Not Exp: Duplicated #%s-%s Candlestick data, id: %d, count: %d", symbol, period, t.Id, v)
-							// 	}
-							// 	tickExpMap[t.Id] = v + 1
-							// }
+							if v, exist := tickExpMap[t.Id]; !exist {
+								// no exist, print error!
+								applogger.Error("NonExist: Received #%s-%s Candlestick data, not exist in exp map, id: %d", symbol, period, t.Id)
+							} else {
+								if v >= 1 {
+									applogger.Error("Duplicated: Received #%s-%s Candlestick data duplicated, id: %d, count: %d", symbol, period, t.Id, v)
+								}
+								tickExpMap[t.Id] = v + 1
+							}
 						}
 					}
 				}

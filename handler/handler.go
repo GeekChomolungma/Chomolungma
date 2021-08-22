@@ -17,8 +17,8 @@ func LocalServer() {
 	r.POST("/api/v1/common/timestamp", getTimestamp)
 	r.GET("/api/v1/commom/reloadkeys", reloadKeys)
 
-	// internal call
-	r.POST("/api/v1/internal/ticksvalidation", ticksValidation)
+	// internal call, close if online product env
+	// r.POST("/api/v1/internal/ticksvalidation", ticksValidation)
 
 	// for account info
 	r.POST("/api/v1/account/accountid", getAccountID)
