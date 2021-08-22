@@ -470,7 +470,7 @@ func TicksValidation(collectionName string) {
 			for _, timeEle := range timeWindow {
 				wsClient.Request(symbol, string(period), timeEle[0], timeEle[1], "2")
 			}
-			wsClient.Request(symbol, string(period), 1629531900, 1629546600+600, "2") //
+			//wsClient.Request(symbol, string(period), 1629531900, 1629546600+600, "2")
 		},
 		func(response interface{}) {
 			resp, ok := response.(market.SubscribeCandlestickResponse)
