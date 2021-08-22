@@ -461,11 +461,7 @@ func TicksValidation(collectionName string) {
 	symbol := sp[1]
 	period := periodUnit(sp[2])
 
-	timeWindow, datalength, err := timeWindowAtEndTime(collectionName, period, startTime, endTime)
-	if err != nil {
-		applogger.Error("timeWindowAtEndTime err: %s", err.Error())
-		return
-	}
+	timeWindow, datalength := timeWindowAtEndTime(collectionName, period, startTime, endTime)
 	applogger.Info("Collection: #%s, start:%d, to:%d. data to be received length is %d, in db length is %d, diff is %d", collectionName, startTime, endTime, datalength, dbCount, datalength-dbCount)
 
 	wsClient := new(marketwebsocketclient.CandlestickWebSocketClient).Init(config.GatewaySetting.GatewayHost)
@@ -481,16 +477,18 @@ func TicksValidation(collectionName string) {
 				rwMutex.Lock()
 				if &resp != nil {
 					if resp.Data != nil {
+						//applogger.Info("Resp: #%s-%s received, from: %d, to: %d", symbol, period, resp.Data[0].Id, resp.Data[len(resp.Data)-1].Id)
 						for _, t := range resp.Data {
 							tickCmp := &market.TickFloat{}
 							err := client.Find(bson.M{"id": t.Id}).One(tickCmp)
 							if err != nil {
-								applogger.Error("Tick not in DB, id: %d, count: %d", t.Id, t.Count)
+								applogger.Error("Tick #%s-%s not in DB, id: %d, count: %d", symbol, period, t.Id, t.Count)
 								incount++
 							} else {
 								tf := t.TickToFloat()
 								if *tf != *tickCmp {
-									applogger.Error("Inconsistent: Received/InDB Candlestick data, id: %d/%d, count: %d/%d, vol: %v/%v [%v-%v-%v-%v]/[%v-%v-%v-%v]",
+									applogger.Error("Inconsistent: Received/InDB #%s-%s Candlestick data, id: %d/%d, count: %d/%d, vol: %v/%v [%v-%v-%v-%v]/[%v-%v-%v-%v]",
+										symbol, period,
 										t.Id, tickCmp.Id,
 										t.Count, tickCmp.Count,
 										t.Vol, tickCmp.Vol,
@@ -499,6 +497,15 @@ func TicksValidation(collectionName string) {
 								}
 							}
 							dataReceived++
+							// if v, exist := tickExpMap[t.Id]; !exist {
+							// 	// no exist, print error!
+							// 	applogger.Error("Not Exp: Received #%s-%s Candlestick data, not exist in exp map, id: %d", symbol, period, t.Id)
+							// } else {
+							// 	if v >= 1 {
+							// 		applogger.Error("Not Exp: Duplicated #%s-%s Candlestick data, id: %d, count: %d", symbol, period, t.Id, v)
+							// 	}
+							// 	tickExpMap[t.Id] = v + 1
+							// }
 						}
 					}
 				}
