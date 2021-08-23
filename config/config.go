@@ -46,6 +46,14 @@ type MarketSubConf struct {
 }
 
 var MarketSubSetting = &MarketSubConf{}
+
+type ValidateConf struct {
+	MarketUrl string
+	Open      string
+}
+
+var ValidateSetting = &ValidateConf{}
+
 var HBMarketSubList []string
 var AccountMap = make(map[string]string)
 var SecretMap = make(map[string]string)
@@ -63,6 +71,7 @@ func Setup() {
 	mapTo(cfg, "gateway", GatewaySetting)
 	mapTo(cfg, "huobi", HuoBiApiSetting)
 	mapTo(cfg, "marketsub", MarketSubSetting)
+	mapTo(cfg, "validate", ValidateSetting)
 
 	// AccessKey
 	if len(HuoBiApiSetting.AccessKey) != len(HuoBiApiSetting.AccountId) {

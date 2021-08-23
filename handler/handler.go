@@ -18,7 +18,9 @@ func LocalServer() {
 	r.GET("/api/v1/commom/reloadkeys", reloadKeys)
 
 	// internal call, close if online product env
-	// r.POST("/api/v1/internal/ticksvalidation", ticksValidation)
+	if config.ValidateSetting.Open == "on" {
+		r.POST("/api/v1/internal/ticksvalidation", ticksValidation)
+	}
 
 	// for account info
 	r.POST("/api/v1/account/accountid", getAccountID)
