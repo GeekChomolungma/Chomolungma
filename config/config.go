@@ -55,6 +55,7 @@ type ValidateConf struct {
 var ValidateSetting = &ValidateConf{}
 
 var HBMarketSubList []string
+var OrderSymbols []string
 var AccountMap = make(map[string]string)
 var SecretMap = make(map[string]string)
 
@@ -106,6 +107,8 @@ func Setup() {
 	}
 
 	for _, syb := range MarketSubSetting.Symbols {
+		applogger.Info("Add order Symbol %s", syb)
+		OrderSymbols = append(OrderSymbols, syb)
 		for _, period := range MarketSubSetting.Periods {
 			label := fmt.Sprintf("HB-%s-%s", syb, period)
 			HBMarketSubList = append(HBMarketSubList, label)

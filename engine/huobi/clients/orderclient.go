@@ -26,8 +26,8 @@ func (p *OrderClient) Init(gatewayHost string, accessKey string, secretKey strin
 	return p
 }
 
-func (p *OrderClient) BuildAndPostGatewayUrl(request *dtos.BaseReqModel, originUrl string) (*dtos.BaseRspModel, error) {
-	urlMsg := p.privateUrlBuilder.Build(request.Method, originUrl, nil)
+func (p *OrderClient) BuildAndPostGatewayUrl(request *dtos.BaseReqModel, originUrl string, huobiGetReq *model.GetRequest) (*dtos.BaseRspModel, error) {
+	urlMsg := p.privateUrlBuilder.Build(request.Method, originUrl, huobiGetReq)
 	request.Url = urlMsg
 	postBody, jsonErr := model.ToJson(request)
 	if jsonErr != nil {
@@ -71,7 +71,7 @@ func (p *OrderClient) PlaceOrder(request *order.PlaceOrderRequest) (*order.Place
 	}
 
 	// build gateway url and post it
-	rawRsp, err := p.BuildAndPostGatewayUrl(requestGateway, "/v1/order/orders/place")
+	rawRsp, err := p.BuildAndPostGatewayUrl(requestGateway, "/v1/order/orders/place", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func (p *OrderClient) CancelOrderById(orderId string) (*order.CancelOrderByIdRes
 
 	// build gateway url and post it
 	originURL := fmt.Sprintf("/v1/order/orders/%s/submitcancel", orderId)
-	rawRsp, err := p.BuildAndPostGatewayUrl(requestGateway, originURL)
+	rawRsp, err := p.BuildAndPostGatewayUrl(requestGateway, originURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -220,13 +220,13 @@ func (p *OrderClient) GetOrderById(orderId string) (*order.GetOrderResponse, err
 
 	// build gateway url and post it
 	originURL := fmt.Sprintf("/v1/order/orders/%s", orderId)
-	rawRsp, err := p.BuildAndPostGatewayUrl(requestGateway, originURL)
+	rawRsp, err := p.BuildAndPostGatewayUrl(requestGateway, originURL, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	result := &order.GetOrderResponse{}
-	jsonErr := json.Unmarshal([]byte(rawRsp.Data), &result)
+	jsonErr := json.Unmarshal([]byte(rawRsp.Data), result)
 	if jsonErr != nil {
 		return nil, jsonErr
 	}
@@ -291,19 +291,30 @@ func (p *OrderClient) GetHistoryOrders(request *model.GetRequest) (*order.GetHis
 
 // Returns orders based on a specific searching criteria (within 48 hours)
 func (p *OrderClient) GetLast48hOrders(request *model.GetRequest) (*order.GetHistoryOrdersResponse, error) {
-	url := p.privateUrlBuilder.Build("GET", "/v1/order/history", request)
-	getResp, getErr := internal.HttpGet(url)
-	if getErr != nil {
-		return nil, getErr
+
+	requestGateway := &dtos.BaseReqModel{
+		AimSite: "HuoBi",
+		Method:  "GET",
+		Body:    "",
 	}
 
-	result := order.GetHistoryOrdersResponse{}
-	jsonErr := json.Unmarshal([]byte(getResp), &result)
+	// build gateway url and post it
+	originURL := "/v1/order/history"
+	rawRsp, err := p.BuildAndPostGatewayUrl(requestGateway, originURL, request)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &order.GetHistoryOrdersResponse{}
+	jsonErr := json.Unmarshal([]byte(rawRsp.Data), &result)
 	if jsonErr != nil {
 		return nil, jsonErr
 	}
+	if result.Status == "ok" {
+		return result, nil
+	}
 
-	return &result, nil
+	return nil, errors.New(rawRsp.Data)
 }
 
 // Returns the match results of past and open orders based on specific search criteria.

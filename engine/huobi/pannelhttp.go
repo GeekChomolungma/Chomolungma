@@ -11,6 +11,7 @@ import (
 	"github.com/GeekChomolungma/Chomolungma/db"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/clients"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/clients/marketwebsocketclient"
+	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/account"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/common"
 	"github.com/GeekChomolungma/Chomolungma/engine/huobi/model/market"
@@ -362,6 +363,76 @@ func GetOrderById(accountID, orderID string) {
 			applogger.Info("Query order error: %s", resp.ErrorMessage)
 		}
 	}
+}
+
+func GetLast48hOrders(accountID, symbol string) {
+	// connect db
+	s, err := db.CreateRootDBSession()
+
+	// seek accessKey with accountID
+	accessKey, err := SeekAccountAccessKey(accountID)
+	if err != nil {
+		applogger.Error("GetOrderById: AccountMap could not found key matches the accountID %s", accountID)
+		return
+	}
+	// seek secretKey with accountID
+	secretKey, err := SeekAccountSecretKey(accountID)
+	if err != nil {
+		applogger.Error("GetOrderById: SecretMap could not found key matches the accountID %s", accountID)
+		return
+	}
+
+	client := new(clients.OrderClient).Init(
+		config.GatewaySetting.GatewayHost,
+		accessKey,
+		secretKey,
+		config.HuoBiApiSetting.ApiServerHost,
+	)
+
+	request := new(model.GetRequest).Init()
+	request.AddParam("symbol", symbol)
+	resp, err := client.GetLast48hOrders(request)
+	if err != nil {
+		applogger.Error(err.Error())
+	} else {
+		switch resp.Status {
+		case "ok":
+			if resp.Data != nil {
+				for _, ho := range resp.Data {
+					o := ho.Transfer()
+					collectionName := fmt.Sprintf("HB-%s-%s", accountID, o.Symbol)
+					dbClient := s.DB("order").C(collectionName)
+					oInDB := &order.OrderInfo{}
+					err := dbClient.Find(bson.M{"orderid": o.OrderId}).One(oInDB)
+					if err != nil {
+						// not exist in db
+						err = dbClient.Insert(o)
+						if err != nil {
+							applogger.Error("Failed to Insert data : %s", err.Error())
+						} else {
+							applogger.Info("Order created, symbol: %s, type: %s, status: %s",
+								o.Symbol, o.Type, o.OrderStatus)
+						}
+					} else {
+						// update
+						selector := bson.M{"orderid": o.OrderId}
+						err := dbClient.Update(selector, o)
+						if err != nil {
+							applogger.Error("Failed to Update data : %s", err.Error())
+						} else {
+							applogger.Info("Order updated, symbol: %s, type: %s, status: %s",
+								o.Symbol, o.Type, o.OrderStatus)
+						}
+					}
+					applogger.Info("Order history, symbol: %s, price: %s, amount: %s, state: %s", ho.Symbol, ho.Price, ho.Amount, ho.State)
+				}
+				applogger.Info("There are total %d orders", len(resp.Data))
+			}
+		case "error":
+			applogger.Error("Get history order error: %s", resp.ErrorMessage)
+		}
+	}
+	s.Close()
 }
 
 // -------------------------------------------------------------COMMON-------------------------------------------------------

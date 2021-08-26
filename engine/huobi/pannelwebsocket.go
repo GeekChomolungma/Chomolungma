@@ -413,12 +413,12 @@ func timeWindowAtEndTime(label string, period periodUnit, startTime, endTime int
 }
 
 // -------------------------------------------------------------ORDER-------------------------------------------------------
-func subOrderUpdateV2(symbol, accountID string) {
+func subOrderUpdateV2(symbols []string, accountID string) {
 	// connect market db
 	s, err := db.CreateRootDBSession()
-	collectionName := fmt.Sprintf("HB-%s-%s", accountID, symbol)
-	dbClient := s.DB("order").C(collectionName)
-	mgoSessionMap[collectionName] = s
+	SessionName := fmt.Sprintf("HB-%s", accountID)
+	mgoSessionMap[SessionName] = s
+
 	if err != nil {
 		applogger.Error("Failed to connection db: %s", err.Error())
 		return
@@ -452,7 +452,10 @@ func subOrderUpdateV2(symbol, accountID string) {
 		func(resp *auth.WebSocketV2AuthenticationResponse) {
 			if resp.IsSuccess() {
 				// Subscribe if authentication passed
-				wsClient.Subscribe(symbol, "1149")
+				for _, symbol := range symbols {
+					go GetLast48hOrders(accountID, symbol)
+					wsClient.Subscribe(symbol, "1149")
+				}
 			} else {
 				applogger.Error("Authentication error, code: %d, message:%s", resp.Code, resp.Message)
 			}
@@ -470,6 +473,8 @@ func subOrderUpdateV2(symbol, accountID string) {
 				} else if subResponse.Action == "push" {
 					if subResponse.Data != nil {
 						o := subResponse.Data
+						collectionName := fmt.Sprintf("HB-%s-%s", accountID, o.Symbol)
+						dbClient := s.DB("order").C(collectionName)
 						oInDB := &order.OrderInfo{}
 						err := dbClient.Find(bson.M{"orderid": o.OrderId}).One(oInDB)
 						if err != nil {
@@ -501,6 +506,6 @@ func subOrderUpdateV2(symbol, accountID string) {
 
 	// Connect to the server and wait for the handler to handle the response
 	wsClient.Connect(true)
-	// HB-AccountID-Symbol
-	wsOrderV2ClientMap[collectionName] = wsClient
+	// HB-AccountID
+	wsOrderV2ClientMap[SessionName] = wsClient
 }

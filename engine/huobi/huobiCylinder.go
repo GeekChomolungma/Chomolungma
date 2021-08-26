@@ -41,7 +41,7 @@ func (HBCylinder *HuoBiCylinder) Ignite() {
 	}
 
 	for accountID := range config.AccountMap {
-		subOrderUpdateV2("btcusdt", accountID)
+		subOrderUpdateV2(config.OrderSymbols, accountID)
 	}
 }
 
@@ -149,8 +149,10 @@ func flushSyncTime() {
 
 func OrderV2ClientFlameout() {
 	for collectionName, client := range wsOrderV2ClientMap {
-		sp := strings.Split(collectionName, "-")
-		client.UnSubscribe(sp[2], "1149")
+		//sp := strings.Split(collectionName, "-")
+		for _, symbol := range config.OrderSymbols {
+			client.UnSubscribe(symbol, "1149")
+		}
 		client.Close()
 		applogger.Info("Order V2 Client: %s closed", collectionName)
 	}
