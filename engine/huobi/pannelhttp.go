@@ -253,6 +253,10 @@ func PlaceOrder(symbol, model, amount, price, source string, accountID string) {
 func checkPricePrecision(price string, precision int) (string, error) {
 	var Price string
 	priceSeperates := strings.Split(price, ".")
+	if len(priceSeperates) == 1 {
+		Price = price
+		return Price, nil
+	}
 	rawDecimal := priceSeperates[1]
 	if len(rawDecimal) >= precision {
 		// cut the price tail
@@ -266,6 +270,10 @@ func checkPricePrecision(price string, precision int) (string, error) {
 func checkAmtPrecision(amount string, precision int) (string, error) {
 	var Amount string
 	amountSeperates := strings.Split(amount, ".")
+	if len(amountSeperates) == 1 {
+		Amount = amount
+		return Amount, nil
+	}
 	rawDecimal := amountSeperates[1]
 	if len(rawDecimal) >= precision {
 		// cut the amount tail
