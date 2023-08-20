@@ -12,6 +12,9 @@ type MongoConf struct {
 	MarketUrl  string
 	AccountUrl string
 	RootUrl    string
+
+	//general uri
+	Uri string
 }
 
 var MongoSetting = &MongoConf{}
@@ -60,9 +63,9 @@ var AccountMap = make(map[string]string)
 var SecretMap = make(map[string]string)
 
 // Setup
-func Setup() {
+func Setup(path string) {
 	applogger.Info("Config Loading...")
-	cfg, err := ini.Load("./my.ini")
+	cfg, err := ini.Load(path)
 	if err != nil {
 		applogger.Error("Fail to parse '../my.ini': %v", err)
 	}

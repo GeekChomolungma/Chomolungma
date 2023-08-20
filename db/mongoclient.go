@@ -2,9 +2,8 @@ package db
 
 import (
 	"github.com/GeekChomolungma/Chomolungma/config"
-	_ "github.com/sbunce/bson"
 	"gopkg.in/mgo.v2"
-	"labix.org/v2/mgo/bson"
+	//"labix.org/v2/mgo/bson"
 )
 
 // return a mongo session
@@ -69,12 +68,12 @@ func findOne() bool {
 		return false
 	}
 
-	client := mongo.DB("mydb_tutorial").C("t_student")
-	user := Student{}
-	cErr := client.Find(bson.M{"sid": "learn_001"}).One(&user)
-	if cErr != nil {
-		return false
-	}
+	// client := mongo.DB("mydb_tutorial").C("t_student")
+	// user := Student{}
+	// cErr := client.Find(bson.M{"sid": "learn_001"}).One(&user)
+	// if cErr != nil {
+	// 	return false
+	// }
 	return true
 }
 
@@ -85,15 +84,15 @@ func findAll() bool {
 		return false
 	}
 
-	client := mongo.DB("mydb_tutorial").C("t_student")
-	iter := client.Find(bson.M{"status": 1}).Sort("_id").Skip(1).Limit(15).Iter()
-	var stu Student
-	var users Per
-	for iter.Next(&stu) {
-		users.Per = append(users.Per, stu)
-	}
-	if err := iter.Close(); err != nil {
-		return false
-	}
+	// client := mongo.DB("mydb_tutorial").C("t_student")
+	// iter := client.Find(bson.M{"status": 1}).Sort("_id").Skip(1).Limit(15).Iter()
+	// var stu Student
+	// var users Per
+	// for iter.Next(&stu) {
+	// 	users.Per = append(users.Per, stu)
+	// }
+	// if err := iter.Close(); err != nil {
+	// 	return false
+	// }
 	return true
 }

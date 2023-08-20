@@ -20,7 +20,7 @@ func main() {
 	fmt.Println("CHOMOLUNGMA!")
 
 	// config server
-	config.Setup()
+	config.Setup("./my.ini")
 
 	// setup the trade engine
 	engine.EngineBus = &engine.TradeEngine{
