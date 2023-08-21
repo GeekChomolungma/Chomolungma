@@ -2,7 +2,6 @@ package engine
 
 import (
 	"github.com/GeekChomolungma/Chomolungma/engine/binance"
-	"github.com/GeekChomolungma/Chomolungma/engine/huobi"
 )
 
 var EngineBus *TradeEngine
@@ -21,7 +20,7 @@ type TradeEngine struct {
 
 func (te *TradeEngine) Load() {
 	te.Cylinders["binance"] = &binance.BinanCylinder{}
-	te.Cylinders["huobi"] = &huobi.HuoBiCylinder{}
+	//te.Cylinders["huobi"] = &huobi.HuoBiCylinder{}
 }
 
 func (te *TradeEngine) Run() {

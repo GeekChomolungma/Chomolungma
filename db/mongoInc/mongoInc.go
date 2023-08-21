@@ -2,9 +2,9 @@ package mongoInc
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/GeekChomolungma/Chomolungma/config"
+	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -56,19 +56,31 @@ func NewMetaCollection[T any](dbName, colName string, dataType MetaType) *MetaCo
 }
 
 func (mc *MetaCollection[T]) Retrieve(key string, value T) {
-	fmt.Sprintln("ready to retrieve")
 	switch mc.DataType {
 	case BinanTest:
 		filter := bson.D{{"name", key}}
 		mc.Collection.FindOne(context.TODO(), filter).Decode(value)
-		fmt.Sprintln("Retrieved key-value: %v, %v", key, value)
 	}
 }
 
-func (mc *MetaCollection[T]) Store(key string, value interface{}) {
-
+func (mc *MetaCollection[T]) Store(key string, value T) {
+	result, err := mc.Collection.InsertOne(context.TODO(), value)
+	if err != nil {
+		applogger.Error("mongo Inc k-v stored failed, e: %v.", err)
+	} else {
+		applogger.Info("mongo Inc k-v stored %s, _id is: %v.", key, result)
+	}
 }
 
 func (mc *MetaCollection[T]) Remove(key string) {
-
+	switch mc.DataType {
+	case BinanTest:
+		filter := bson.D{{"name", key}}
+		count, err := mc.Collection.DeleteMany(context.TODO(), filter)
+		if err != nil {
+			applogger.Error("mongo Inc k-v remove failed, e: %v.", err)
+		} else {
+			applogger.Info("mongo Inc k-v remove %s, deleted count is: %v.", key, count)
+		}
+	}
 }

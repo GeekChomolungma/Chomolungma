@@ -11,6 +11,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/GeekChomolungma/Chomolungma/config"
+	"github.com/GeekChomolungma/Chomolungma/db/mongoInc"
 	"github.com/GeekChomolungma/Chomolungma/engine"
 	"github.com/GeekChomolungma/Chomolungma/handler"
 	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
@@ -26,6 +27,8 @@ func main() {
 	engine.EngineBus = &engine.TradeEngine{
 		Cylinders: make(map[string]engine.Cylinder),
 	}
+
+	mongoInc.Init(config.MongoSetting.Uri)
 	engine.EngineBus.Load()
 	engine.EngineBus.Run()
 

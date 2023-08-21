@@ -21,4 +21,12 @@ func main() {
 	value := &TestMeta{}
 	metaCol.Retrieve("alex", value)
 	fmt.Println("Value Retrieved:", value.Name)
+
+	valueInserted := &TestMeta{
+		Name: "zxx",
+	}
+	metaCol.Store("zxx", valueInserted)
+	metaCol.Store("zxx", valueInserted)
+
+	metaCol.Remove("zxx")
 }

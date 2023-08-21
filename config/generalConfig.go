@@ -25,24 +25,6 @@ type Server struct {
 
 var ServerSetting = &Server{}
 
-type HuoBiApiConf struct {
-	ApiServerHost string
-	AccessKey     []string
-	AccountId     []string
-	SubUid        int
-	SubUids       string
-	SecretKey     []string
-}
-
-var HuoBiApiSetting = &HuoBiApiConf{}
-
-type GatewayConf struct {
-	GatewayHost    string
-	GatewayTcpHost string
-}
-
-var GatewaySetting = &GatewayConf{}
-
 type MarketSubConf struct {
 	Symbols []string
 	Periods []string
@@ -72,8 +54,11 @@ func Setup(path string) {
 
 	mapTo(cfg, "mongo", MongoSetting)
 	mapTo(cfg, "server", ServerSetting)
+
 	mapTo(cfg, "gateway", GatewaySetting)
 	mapTo(cfg, "huobi", HuoBiApiSetting)
+	mapTo(cfg, "binance", BinanApiSetting)
+
 	mapTo(cfg, "marketsub", MarketSubSetting)
 	mapTo(cfg, "validate", ValidateSetting)
 
