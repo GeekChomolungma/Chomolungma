@@ -12,6 +12,8 @@ type BinanCylinder struct {
 // Ignite starts up to update data: market, account, order..
 // Those data will be used inner Chmolungma
 func (BACylinder *BinanCylinder) Ignite() {
+	binance_connector.WebsocketKeepalive = true
+
 	go func() {
 		metaCol := mongoInc.NewMetaCollection[*binance_connector.WsKlineEvent]("marketInfo", "BTCUSDT", mongoInc.BinanKline)
 
@@ -23,12 +25,14 @@ func (BACylinder *BinanCylinder) Ignite() {
 		errHandler := func(err error) {
 			applogger.Error("BTCUSDT subscription error: %s", err.Error())
 		}
+
 		doneCh, _, err := websocketStreamClient.WsKlineServe("BTCUSDT", "1m", wsKlineHandler, errHandler)
 		if err != nil {
 			applogger.Error("WsKlineServe error: %s", err.Error())
 			return
 		}
 		<-doneCh
+		applogger.Warn("WsKlineServe closed by doneCh")
 	}()
 }
 
