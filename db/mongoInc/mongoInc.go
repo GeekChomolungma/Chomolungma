@@ -3,7 +3,6 @@ package mongoInc
 import (
 	"context"
 
-	"github.com/GeekChomolungma/Chomolungma/config"
 	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -22,7 +21,7 @@ var MongoClient *mongo.Client
 
 func Init(uri string) {
 	var err error
-	MongoClient, err = mongo.Connect(context.TODO(), options.Client().ApplyURI(config.MongoSetting.Uri))
+	MongoClient, err = mongo.Connect(context.TODO(), options.Client().ApplyURI(uri))
 	if err != nil {
 		panic(err)
 	}
@@ -34,6 +33,7 @@ const (
 	BinanTest MetaType = iota
 	BinanKline
 	BinanAccountInfo
+	BinanSyncFlag
 )
 
 type MetaCollection[T any] struct {
@@ -55,10 +55,12 @@ func NewMetaCollection[T any](dbName, colName string, dataType MetaType) *MetaCo
 	return mc
 }
 
-func (mc *MetaCollection[T]) Retrieve(key string, value T) {
+func (mc *MetaCollection[T]) Retrieve(keyName string, keyValue interface{}, value T) {
 	switch mc.DataType {
 	case BinanTest:
-		filter := bson.D{{"name", key}}
+	case BinanSyncFlag:
+		filter := bson.D{{keyName, keyValue}}
+		//filter := bson.M{keyName: keyValue}
 		mc.Collection.FindOne(context.TODO(), filter).Decode(value)
 	}
 }

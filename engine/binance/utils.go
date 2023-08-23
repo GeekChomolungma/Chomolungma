@@ -6,6 +6,7 @@ import (
 
 func KlineStreamPattern(symbol, interval string, kline *binance_connector.KlinesResponse) *binance_connector.WsKlineEvent {
 	klineStream := &binance_connector.WsKlineEvent{}
+	klineStream.Event = "kline"
 	klineStream.Time = int64(kline.CloseTime)
 	klineStream.Symbol = symbol
 
