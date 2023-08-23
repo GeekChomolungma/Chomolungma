@@ -2,4 +2,4 @@
 *.ini
 db/mongoTest/go.mod
 db/mongoTest/go.sum
-./cmd/
+cmd/
