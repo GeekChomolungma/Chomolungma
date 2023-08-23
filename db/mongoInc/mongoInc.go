@@ -57,8 +57,7 @@ func NewMetaCollection[T any](dbName, colName string, dataType MetaType) *MetaCo
 
 func (mc *MetaCollection[T]) Retrieve(keyName string, keyValue interface{}, value T) {
 	switch mc.DataType {
-	case BinanTest:
-	case BinanSyncFlag:
+	case BinanTest, BinanSyncFlag, BinanKline:
 		filter := bson.D{{keyName, keyValue}}
 		//filter := bson.M{keyName: keyValue}
 		mc.Collection.FindOne(context.TODO(), filter).Decode(value)

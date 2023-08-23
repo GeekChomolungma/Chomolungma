@@ -18,6 +18,7 @@ func SubscribeKlineStream(symbolName, intervalValue string) {
 		lockMap[symbolName].Lock()
 		defer lockMap[symbolName].Unlock()
 		metaCol.Retrieve("kline.starttime", event.Kline.StartTime, eventStored)
+		applogger.Debug("SubscribeKlineStream: Retrieve kline: %v", binance_connector.PrettyPrint(eventStored))
 		if eventStored.Event != "kline" {
 			// non exist, just insert it
 			metaCol.Store("", event)

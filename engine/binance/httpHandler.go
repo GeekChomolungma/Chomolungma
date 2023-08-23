@@ -6,8 +6,8 @@ import (
 	"github.com/GeekChomolungma/Chomolungma/db/mongoInc"
 	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
 	binance_connector "github.com/binance/binance-connector-go"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"gopkg.in/mgo.v2/bson"
 )
 
 const (
