@@ -64,7 +64,9 @@ func SubscribeKlineStream(symbolName, intervalValue string) {
 		}
 	}
 	errHandler := func(err error) {
-		applogger.Error("%v subscription error: %s", symbolName, err.Error())
+		applogger.Error("Symbol:%v, subscription error: %s", symbolName, err.Error())
+		applogger.Info("Re Subscribe market info.")
+		go SubscribeKlineStream(symbolName, intervalValue)
 	}
 
 	doneCh, _, err := websocketStreamClient.WsKlineServe(symbolName, intervalValue, wsKlineHandler, errHandler)
@@ -73,5 +75,5 @@ func SubscribeKlineStream(symbolName, intervalValue string) {
 		return
 	}
 	<-doneCh
-	applogger.Warn("WsKlineServe closed by doneCh")
+	applogger.Warn("Symbol: %v, WsKlineServe closed by doneCh", symbolName)
 }
