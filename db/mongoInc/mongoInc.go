@@ -64,13 +64,14 @@ func (mc *MetaCollection[T]) Retrieve(keyName string, keyValue interface{}, valu
 	}
 }
 
-func (mc *MetaCollection[T]) Store(key string, value T) {
+func (mc *MetaCollection[T]) Store(key string, value T) error {
 	result, err := mc.Collection.InsertOne(context.TODO(), value)
 	if err != nil {
 		applogger.Error("mongo Inc k-v stored failed, e: %v.", err)
 	} else {
 		applogger.Info("mongo Inc k-v stored %s, _id is: %v.", key, result)
 	}
+	return err
 }
 
 func (mc *MetaCollection[T]) Remove(key string) {

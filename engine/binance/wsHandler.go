@@ -2,11 +2,12 @@ package binance
 
 import (
 	"context"
+	"time"
 
 	"github.com/GeekChomolungma/Chomolungma/db/mongoInc"
 	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
 	binance_connector "github.com/binance/binance-connector-go"
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func SubscribeKlineStream(symbolName, intervalValue string) {
@@ -59,8 +60,23 @@ func SubscribeKlineStream(symbolName, intervalValue string) {
 					{"kline.activebuyvolume", event.Kline.ActiveBuyVolume},
 					{"kline.activebuyquotevolume", event.Kline.ActiveBuyQuoteVolume},
 				}}}
-			metaCol.Collection.UpdateOne(context.TODO(), filter, update)
-			applogger.Info("SubscribeKlineStream: update the kline event: %v", binance_connector.PrettyPrint(event))
+
+			stored := false
+			for i := 0; i < 3; i++ {
+				_, err := metaCol.Collection.UpdateOne(context.TODO(), filter, update)
+				if err != nil {
+					applogger.Error("SubscribeKlineStream: Update the kline: %v, failed e: %v", event.Kline.StartTime, err)
+					time.Sleep(time.Second)
+					continue
+				} else {
+					applogger.Info("SubscribeKlineStream: Update the kline event: %v", binance_connector.PrettyPrint(event))
+					stored = true
+					break
+				}
+			}
+			if !stored {
+				applogger.Error("SubscribeKlineStream: UpdateOne the kline: %v, failed 3 times.", event.Kline.StartTime)
+			}
 		}
 	}
 	errHandler := func(err error) {
