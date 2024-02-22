@@ -11,7 +11,7 @@ const (
 	Period_5min  periodUnit = "5m"
 	Period_15min periodUnit = "15m"
 	Period_30min periodUnit = "30m"
-	Period_60min periodUnit = "60m"
+	Period_60min periodUnit = "1h"
 	Period_4hour periodUnit = "4h"
 	Period_1day  periodUnit = "1d"
 	Period_1week periodUnit = "1w"
