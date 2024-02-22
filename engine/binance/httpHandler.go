@@ -61,26 +61,26 @@ func SyncHistoricalKline(recordLabel, symbolName, intervalValue string, startTim
 		klines, err := client.NewKlinesService().
 			Symbol(symbolName).Interval(intervalValue).StartTime(timePair[0]).EndTime(timePair[1]).Do(context.Background())
 		if err != nil {
-			applogger.Warn("SyncHistoricalKline: GetKline failed once: timeWindow(500) index is %d, start:%d, to:%d", k, timePair[0], timePair[1])
+			applogger.Warn("SyncHistoricalKline: GetKline(%s) failed once: timeWindow(500) index is %d, start:%d, to:%d", recordLabel, k, timePair[0], timePair[1])
 			continue
 		} else {
-			applogger.Info("SyncHistoricalKline: GetKline succeeded once: timeWindow(500) index is %d, start:%d, to:%d, kline count: %v", k, timePair[0], timePair[1], len(klines))
+			applogger.Info("SyncHistoricalKline: GetKline(%s) succeeded once: timeWindow(500) index is %d, start:%d, to:%d, kline count: %v", recordLabel, k, timePair[0], timePair[1], len(klines))
 		}
 
-		metaCol := mongoInc.NewMetaCollection[*binance_connector.WsKlineEvent]("marketInfo", symbolName, mongoInc.BinanKline)
+		metaCol := mongoInc.NewMetaCollection[*binance_connector.WsKlineEvent]("marketInfo", recordLabel, mongoInc.BinanKline)
 		for _, kline := range klines {
 			eventStored := &binance_connector.WsKlineEvent{}
 			metaCol.Retrieve("kline.starttime", kline.OpenTime, eventStored)
 			if eventStored.Event != "kline" {
 				// non exist, just insert it
 				klineStream := KlineStreamPattern(symbolName, intervalValue, kline)
-				applogger.Info("SyncHistoricalKline: Store Kline into DB, StartT: %v", klineStream.Kline.StartTime)
+				applogger.Info("SyncHistoricalKline: Store kline(%s) into DB, StartT: %v", recordLabel, klineStream.Kline.StartTime)
 				metaCol.Store("", klineStream)
 				continue
 			} else {
 				// for those existed item, try to update
 				if eventStored.Kline.IsFinal {
-					applogger.Warn("SyncHistoricalKline: kline.starttime: %v has finished synchron, discard incomming historical kline.", eventStored.Kline.StartTime)
+					applogger.Warn("SyncHistoricalKline: kline(%s) starttime: %v has finished synchron, discard incomming historical kline.", recordLabel, eventStored.Kline.StartTime)
 					continue
 				} else {
 					// update:
@@ -99,7 +99,7 @@ func SyncHistoricalKline(recordLabel, symbolName, intervalValue string, startTim
 							{"kline.activebuyquotevolume", kline.TakerBuyQuoteAssetVolume},
 						}}}
 					metaCol.Collection.UpdateOne(context.TODO(), filter, update)
-					applogger.Info("SyncHistoricalKline: update the kline event: %v", binance_connector.PrettyPrint(kline))
+					applogger.Info("SyncHistoricalKline: update the kline(%s) event: %v", recordLabel, binance_connector.PrettyPrint(kline))
 				}
 			}
 		}
@@ -110,9 +110,9 @@ func SyncHistoricalKline(recordLabel, symbolName, intervalValue string, startTim
 		opts := options.Update().SetUpsert(true)
 		result, err := syncFlagCol.Collection.UpdateOne(context.TODO(), filter, update, opts)
 		if err != nil {
-			applogger.Warn("SyncHistoricalKline: Update Kline Sync Flag failed: %v", err)
+			applogger.Warn("SyncHistoricalKline: Update kline(%s) Sync Flag failed: %v", recordLabel, err)
 		} else {
-			applogger.Info("SyncHistoricalKline: Update Kline Sync Flag succeeded: %v", binance_connector.PrettyPrint(result))
+			applogger.Info("SyncHistoricalKline: Update kline(%s) Sync Flag succeeded: %v", recordLabel, binance_connector.PrettyPrint(result))
 		}
 	}
 }

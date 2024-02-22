@@ -11,7 +11,7 @@ import (
 )
 
 func SubscribeKlineStream(recordLabel, symbolName, intervalValue string) {
-	metaCol := mongoInc.NewMetaCollection[*binance_connector.WsKlineEvent]("marketInfo", symbolName, mongoInc.BinanKline)
+	metaCol := mongoInc.NewMetaCollection[*binance_connector.WsKlineEvent]("marketInfo", recordLabel, mongoInc.BinanKline)
 
 	websocketStreamClient := binance_connector.NewWebsocketStreamClient(false)
 	wsKlineHandler := func(event *binance_connector.WsKlineEvent) {
@@ -23,13 +23,13 @@ func SubscribeKlineStream(recordLabel, symbolName, intervalValue string) {
 		if eventStored.Event != "kline" {
 			// non exist, just insert it
 			metaCol.Store("", event)
-			applogger.Info("SubscribeKlineStream: insert the kline event: %v", binance_connector.PrettyPrint(event))
+			applogger.Info("SubscribeKlineStream: insert the kline(%s) event: %v", recordLabel, binance_connector.PrettyPrint(event))
 			return
 		}
 
 		if eventStored.Kline.IsFinal || eventStored.Kline.TradeNum > event.Kline.TradeNum {
-			applogger.Warn("SubscribeKlineStream: kline.starttime: %v has a later state(maybe finished synchron) than the incomming event, discard it.",
-				eventStored.Kline.StartTime)
+			applogger.Warn("SubscribeKlineStream: kline(%s) starttime: %v has a later state(maybe finished synchron) than the incomming event, discard it.",
+				recordLabel, eventStored.Kline.StartTime)
 			return
 		} else {
 			// update:
@@ -65,17 +65,17 @@ func SubscribeKlineStream(recordLabel, symbolName, intervalValue string) {
 			for i := 0; i < 3; i++ {
 				_, err := metaCol.Collection.UpdateOne(context.TODO(), filter, update)
 				if err != nil {
-					applogger.Error("SubscribeKlineStream: Update the kline: %v, failed e: %v", event.Kline.StartTime, err)
+					applogger.Error("SubscribeKlineStream: Update the kline(%s) startTime: %v, failed e: %v", recordLabel, event.Kline.StartTime, err)
 					time.Sleep(time.Second)
 					continue
 				} else {
-					applogger.Info("SubscribeKlineStream: Update the kline event: %v", binance_connector.PrettyPrint(event))
+					applogger.Info("SubscribeKlineStream: Update the kline(%s) event: %v", recordLabel, binance_connector.PrettyPrint(event))
 					stored = true
 					break
 				}
 			}
 			if !stored {
-				applogger.Error("SubscribeKlineStream: UpdateOne the kline: %v, failed 3 times.", event.Kline.StartTime)
+				applogger.Error("SubscribeKlineStream: UpdateOne the  kline(%s): %v, failed 3 times.", recordLabel, event.Kline.StartTime)
 			}
 		}
 	}

@@ -22,7 +22,7 @@ func (BACylinder *BinanCylinder) Ignite() {
 		go SubscribeKlineStream(marketUnit.RecordLabel, marketUnit.Symbol, marketUnit.Interval) //"Binance-ETCUSDT-1m", "ETCUSDT", "1m"
 
 		currentTime := ServerTime()
-		SyncHistoricalKline(marketUnit.RecordLabel, marketUnit.Symbol, marketUnit.Interval, 0, currentTime.ServerTime) // "ETCUSDT", "1m"
+		go SyncHistoricalKline(marketUnit.RecordLabel, marketUnit.Symbol, marketUnit.Interval, 0, currentTime.ServerTime) // "ETCUSDT", "1m"
 	}
 }
 
