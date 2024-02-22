@@ -105,14 +105,19 @@ func SyncHistoricalKline(recordLabel, symbolName, intervalValue string, startTim
 		}
 
 		// update the synced time, till the last kline's starttime.
-		filter := bson.D{{"symbol", symbolName}}
-		update := bson.D{{"$set", bson.D{{"starttime", klines[len(klines)-1].OpenTime}}}}
-		opts := options.Update().SetUpsert(true)
-		result, err := syncFlagCol.Collection.UpdateOne(context.TODO(), filter, update, opts)
-		if err != nil {
-			applogger.Warn("SyncHistoricalKline: Update kline(%s) Sync Flag failed: %v", recordLabel, err)
+		if len(klines) == 0 {
+			// no klines, maybe this project coin not yet published at this time window
+			applogger.Info("SyncHistoricalKline: kline(%s) NOT published at this time window: %d to %d", recordLabel, timePair[0], timePair[1])
 		} else {
-			applogger.Info("SyncHistoricalKline: Update kline(%s) Sync Flag succeeded: %v", recordLabel, binance_connector.PrettyPrint(result))
+			filter := bson.D{{"symbol", symbolName}}
+			update := bson.D{{"$set", bson.D{{"starttime", klines[len(klines)-1].OpenTime}}}}
+			opts := options.Update().SetUpsert(true)
+			result, err := syncFlagCol.Collection.UpdateOne(context.TODO(), filter, update, opts)
+			if err != nil {
+				applogger.Warn("SyncHistoricalKline: Update kline(%s) Sync Flag failed: %v", recordLabel, err)
+			} else {
+				applogger.Info("SyncHistoricalKline: Update kline(%s) Sync Flag succeeded: %v", recordLabel, binance_connector.PrettyPrint(result))
+			}
 		}
 	}
 }
