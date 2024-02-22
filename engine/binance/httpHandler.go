@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	baseURL = "https://api.binance.com"
+	baseURL         = "https://api.binance.com"
+	TEST_START_TIME = 1640966400000
 )
 
 // ServerTime gets binance time
@@ -38,13 +39,13 @@ type SyncFlag struct {
 	StartTime uint64
 }
 
-func SyncHistoricalKline(symbolName, intervalValue string, startTime, endTime uint64) {
-	syncFlagCol := mongoInc.NewMetaCollection[*SyncFlag]("marketSyncFlag", symbolName, mongoInc.BinanSyncFlag)
+func SyncHistoricalKline(recordLabel, symbolName, intervalValue string, startTime, endTime uint64) {
+	syncFlagCol := mongoInc.NewMetaCollection[*SyncFlag]("marketSyncFlag", recordLabel, mongoInc.BinanSyncFlag)
 	syncFlag := &SyncFlag{}
-	if startTime < 1692670260000 {
-		syncFlagCol.Retrieve("symbol", symbolName, syncFlag)
-		if syncFlag.StartTime < 1692670260000 {
-			syncFlag.StartTime = 1692670260000
+	if startTime < TEST_START_TIME {
+		syncFlagCol.Retrieve("symbol", recordLabel, syncFlag)
+		if syncFlag.StartTime < TEST_START_TIME {
+			syncFlag.StartTime = TEST_START_TIME
 		}
 		startTime = syncFlag.StartTime
 	}

@@ -32,6 +32,12 @@ type MarketSubConf struct {
 
 var MarketSubSetting = &MarketSubConf{}
 
+type MarketSubUnit struct {
+	RecordLabel string
+	Symbol      string
+	Interval    string
+}
+
 type ValidateConf struct {
 	MarketUrl string
 	Open      string
@@ -40,6 +46,7 @@ type ValidateConf struct {
 var ValidateSetting = &ValidateConf{}
 
 var HBMarketSubList []string
+var BinanceMarketSubList []*MarketSubUnit
 var OrderSymbols []string
 var AccountMap = make(map[string]string)
 var SecretMap = make(map[string]string)
@@ -98,11 +105,20 @@ func Setup(path string) {
 		applogger.Info("Add order Symbol %s", syb)
 		OrderSymbols = append(OrderSymbols, syb)
 		for _, period := range MarketSubSetting.Periods {
-			label := fmt.Sprintf("HB-%s-%s", syb, period)
-			HBMarketSubList = append(HBMarketSubList, label)
+			HBLabel := fmt.Sprintf("HB-%s-%s", syb, period)
+			HBMarketSubList = append(HBMarketSubList, HBLabel)
+
+			BinanLabel := fmt.Sprintf("Binance-%s-%s", syb, period)
+			marketUnit := &MarketSubUnit{
+				RecordLabel: BinanLabel,
+				Symbol:      syb,
+				Interval:    period,
+			}
+			BinanceMarketSubList = append(BinanceMarketSubList, marketUnit)
 		}
 	}
 	applogger.Info("HB marketinfo sub list length is %d", len(HBMarketSubList))
+	applogger.Info("Binan marketinfo sub list length is %d", len(BinanceMarketSubList))
 	applogger.Info("API and Secret Keys Loaded, there are %d accountkeys and %d secretKey.", len(HuoBiApiSetting.AccessKey), len(HuoBiApiSetting.SecretKey))
 	applogger.Info("Config Setup Success.")
 }

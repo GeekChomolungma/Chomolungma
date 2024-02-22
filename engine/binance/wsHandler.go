@@ -10,14 +10,14 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func SubscribeKlineStream(symbolName, intervalValue string) {
+func SubscribeKlineStream(recordLabel, symbolName, intervalValue string) {
 	metaCol := mongoInc.NewMetaCollection[*binance_connector.WsKlineEvent]("marketInfo", symbolName, mongoInc.BinanKline)
 
 	websocketStreamClient := binance_connector.NewWebsocketStreamClient(false)
 	wsKlineHandler := func(event *binance_connector.WsKlineEvent) {
 		eventStored := &binance_connector.WsKlineEvent{}
-		lockMap[symbolName].Lock()
-		defer lockMap[symbolName].Unlock()
+		lockMap[recordLabel].Lock()
+		defer lockMap[recordLabel].Unlock()
 		metaCol.Retrieve("kline.starttime", event.Kline.StartTime, eventStored)
 		applogger.Debug("SubscribeKlineStream: Retrieve kline: %v", binance_connector.PrettyPrint(eventStored))
 		if eventStored.Event != "kline" {
@@ -82,7 +82,7 @@ func SubscribeKlineStream(symbolName, intervalValue string) {
 	errHandler := func(err error) {
 		applogger.Error("Symbol:%v, subscription error: %s", symbolName, err.Error())
 		applogger.Info("Re Subscribe market info.")
-		go SubscribeKlineStream(symbolName, intervalValue)
+		go SubscribeKlineStream(recordLabel, symbolName, intervalValue)
 	}
 
 	doneCh, _, err := websocketStreamClient.WsKlineServe(symbolName, intervalValue, wsKlineHandler, errHandler)
