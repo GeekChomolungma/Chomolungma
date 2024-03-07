@@ -9,6 +9,14 @@ import (
 
 var lockMap map[string]*sync.Mutex
 
+type historySynced struct {
+	finished bool
+}
+
+var hsFlag historySynced = historySynced{
+	finished: false,
+}
+
 type BinanCylinder struct {
 }
 
@@ -19,10 +27,10 @@ func (BACylinder *BinanCylinder) Ignite() {
 	binance_connector.WebsocketKeepalive = true
 	for _, marketUnit := range config.BinanceMarketSubList {
 		lockMap[marketUnit.RecordLabel] = &sync.Mutex{}
-		go SubscribeKlineStream(marketUnit.RecordLabel, marketUnit.Symbol, marketUnit.Interval) //"Binance-ETCUSDT-1m", "ETCUSDT", "1m"
+		go SubscribeKlineStream(marketUnit.RecordLabel, marketUnit.Symbol, marketUnit.Interval, &hsFlag) //"Binance-ETCUSDT-1m", "ETCUSDT", "1m"
 
 		currentTime := ServerTime()
-		go SyncHistoricalKline(marketUnit.RecordLabel, marketUnit.Symbol, marketUnit.Interval, 0, currentTime.ServerTime) // "ETCUSDT", "1m"
+		go SyncHistoricalKline(marketUnit.RecordLabel, marketUnit.Symbol, marketUnit.Interval, 0, currentTime.ServerTime, &hsFlag) // "ETCUSDT", "1m"
 	}
 }
 

@@ -8,13 +8,39 @@ import (
 	"github.com/GeekChomolungma/Chomolungma/logging/applogger"
 	binance_connector "github.com/binance/binance-connector-go"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func SubscribeKlineStream(recordLabel, symbolName, intervalValue string) {
+func SubscribeKlineStream(recordLabel, symbolName, intervalValue string, hsFlag *historySynced) {
+	syncFlagCol := mongoInc.NewMetaCollection[*SyncFlag]("marketSyncFlag", recordLabel, mongoInc.BinanSyncFlag)
+	var currentKlineOpen int64 = 0
 	metaCol := mongoInc.NewMetaCollection[*binance_connector.WsKlineEvent]("marketInfo", recordLabel, mongoInc.BinanKline)
 
 	websocketStreamClient := binance_connector.NewWebsocketStreamClient(false)
 	wsKlineHandler := func(event *binance_connector.WsKlineEvent) {
+		// update sync flag
+		if hsFlag.finished {
+			if currentKlineOpen == 0 {
+				syncFlag := &SyncFlag{}
+				syncFlagCol.Retrieve("symbol", symbolName, syncFlag)
+				currentKlineOpen = int64(syncFlag.StartTime)
+			}
+
+			if currentKlineOpen != event.Kline.StartTime {
+				// update synced as currentKlineOpen
+				filter := bson.D{{"symbol", symbolName}}
+				update := bson.D{{"$set", bson.D{{"starttime", currentKlineOpen}}}}
+				opts := options.Update().SetUpsert(true)
+				_, err := syncFlagCol.Collection.UpdateOne(context.TODO(), filter, update, opts)
+				if err != nil {
+					applogger.Warn("SubscribeKlineStream: Update kline(%s) Sync Flag failed: %v", recordLabel, err)
+				} else {
+					applogger.Info("SubscribeKlineStream: Update kline(%s) Sync Flag succeeded: %v", recordLabel, currentKlineOpen)
+				}
+			}
+		}
+		currentKlineOpen = event.Kline.StartTime
+
 		eventStored := &binance_connector.WsKlineEvent{}
 		lockMap[recordLabel].Lock()
 		defer lockMap[recordLabel].Unlock()
@@ -82,7 +108,7 @@ func SubscribeKlineStream(recordLabel, symbolName, intervalValue string) {
 	errHandler := func(err error) {
 		applogger.Error("Symbol:%v, subscription error: %s", symbolName, err.Error())
 		applogger.Info("Re Subscribe market info.")
-		go SubscribeKlineStream(recordLabel, symbolName, intervalValue)
+		go SubscribeKlineStream(recordLabel, symbolName, intervalValue, hsFlag)
 	}
 
 	doneCh, _, err := websocketStreamClient.WsKlineServe(symbolName, intervalValue, wsKlineHandler, errHandler)

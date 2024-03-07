@@ -39,11 +39,11 @@ type SyncFlag struct {
 	StartTime uint64
 }
 
-func SyncHistoricalKline(recordLabel, symbolName, intervalValue string, startTime, endTime uint64) {
+func SyncHistoricalKline(recordLabel, symbolName, intervalValue string, startTime, endTime uint64, hsFlag *historySynced) {
 	syncFlagCol := mongoInc.NewMetaCollection[*SyncFlag]("marketSyncFlag", recordLabel, mongoInc.BinanSyncFlag)
 	syncFlag := &SyncFlag{}
 	if startTime < TEST_START_TIME {
-		syncFlagCol.Retrieve("symbol", recordLabel, syncFlag)
+		syncFlagCol.Retrieve("symbol", symbolName, syncFlag)
 		if syncFlag.StartTime < TEST_START_TIME {
 			syncFlag.StartTime = TEST_START_TIME
 		}
@@ -120,6 +120,7 @@ func SyncHistoricalKline(recordLabel, symbolName, intervalValue string, startTim
 		if err != nil {
 			applogger.Warn("SyncHistoricalKline: Update kline(%s) Sync Flag failed: %v", recordLabel, err)
 		} else {
+			hsFlag.finished = true
 			applogger.Info("SyncHistoricalKline: Update kline(%s) Sync Flag succeeded: %v", recordLabel, binance_connector.PrettyPrint(result))
 		}
 	}
