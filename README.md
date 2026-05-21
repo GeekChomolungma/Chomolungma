@@ -2,7 +2,7 @@
 
 A Go-based cryptocurrency exchange data sync and trade execution module, supporting **Binance** and **HuoBi**. It provides two core capabilities:
 
-- **Market data sync** — synchronises K-line data into MongoDB *(legacy; a new dedicated implementation exists in a separate repository)*
+- **Market data sync** — synchronises K-line data into MongoDB *(legacy; superseded by [ChomoSyncer](https://github.com/GeekChomolungma/ChomoSyncer))*
 - **Trade execution** — order placement, cancellation, account queries, and real-time order push *(primary focus of this module)*
 
 ---
